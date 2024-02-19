@@ -204,8 +204,18 @@ class MonitoringHub(RepresentationMixin):
         self.block_msgs: Queue[AddressedMonitoringMessage]
         self.block_msgs = SizedQueue()
 
+        self.energy_msgs: Queue[AddressedMonitoringMessage]
+        self.energy_msgs = SizedQueue()
+
         self.router_proc = ForkProcess(target=router_starter,
-                                       args=(comm_q, self.exception_q, self.priority_msgs, self.node_msgs, self.block_msgs, self.resource_msgs),
+                                       args=(comm_q, 
+                                             self.exception_q, 
+                                             self.priority_msgs, 
+                                             self.node_msgs, 
+                                             self.block_msgs, 
+                                             self.resource_msgs,
+                                             self.energy_msgs
+                                        ),
                                        kwargs={"hub_address": self.hub_address,
                                                "hub_port": self.hub_port,
                                                "hub_port_range": self.hub_port_range,
@@ -219,7 +229,13 @@ class MonitoringHub(RepresentationMixin):
         self.router_proc.start()
 
         self.dbm_proc = ForkProcess(target=dbm_starter,
-                                    args=(self.exception_q, self.priority_msgs, self.node_msgs, self.block_msgs, self.resource_msgs,),
+                                    args=(self.exception_q, 
+                                          self.priority_msgs, 
+                                          self.node_msgs, 
+                                          self.block_msgs, 
+                                          self.resource_msgs,
+                                          self.energy_msgs
+                                    ),
                                     kwargs={"logdir": self.logdir,
                                             "logging_level": logging.DEBUG if self.monitoring_debug else logging.INFO,
                                             "db_url": self.logging_endpoint,
@@ -231,7 +247,7 @@ class MonitoringHub(RepresentationMixin):
         self.logger.info("Started the router process {} and DBM process {}".format(self.router_proc.pid, self.dbm_proc.pid))
 
         self.filesystem_proc = Process(target=filesystem_receiver,
-                                       args=(self.logdir, self.resource_msgs, run_dir),
+                                       args=(self.logdir, self.resource_msgs, self.energy_msgs, run_dir),
                                        name="Monitoring-Filesystem-Process",
                                        daemon=True
                                        )
@@ -329,7 +345,8 @@ class MonitoringHub(RepresentationMixin):
 
 
 @wrap_with_logs
-def filesystem_receiver(logdir: str, q: "queue.Queue[AddressedMonitoringMessage]", run_dir: str) -> None:
+# def filesystem_receiver(logdir: str, q: "queue.Queue[AddressedMonitoringMessage]", run_dir: str) -> None:
+def filesystem_receiver(logdir: str, resource_queue: "queue.Queue[AddressedMonitoringMessage]", energy_queue: "queue.Queue[AddressedMonitoringMessage]", run_dir: str) -> None:
     logger = start_file_logger("{}/monitoring_filesystem_radio.log".format(logdir),
                                name="monitoring_filesystem_radio",
                                level=logging.INFO)
@@ -356,7 +373,12 @@ def filesystem_receiver(logdir: str, q: "queue.Queue[AddressedMonitoringMessage]
                     message = deserialize(f.read())
                 logger.debug(f"Message received is: {message}")
                 assert isinstance(message, tuple)
-                q.put(cast(AddressedMonitoringMessage, message))
+                # q.put(cast(AddressedMonitoringMessage, message))
+                if message[0][0] == MessageType.RESOURCE_INFO:
+                    resource_queue.put(cast(AddressedMonitoringMessage, message))
+                elif message[0][0] == MessageType.ENERGY_INFO:
+                    logger.info(f"Putting result into energy_queue")
+                    energy_queue.put(cast(AddressedMonitoringMessage, message))
                 os.remove(full_path_filename)
             except Exception:
                 logger.exception(f"Exception processing {filename} - probably will be retried next iteration")
@@ -441,15 +463,22 @@ class MonitoringRouter:
               priority_msgs: "queue.Queue[AddressedMonitoringMessage]",
               node_msgs: "queue.Queue[AddressedMonitoringMessage]",
               block_msgs: "queue.Queue[AddressedMonitoringMessage]",
-              resource_msgs: "queue.Queue[AddressedMonitoringMessage]") -> None:
+              resource_msgs: "queue.Queue[AddressedMonitoringMessage]",
+              energy_msgs: "queue.Queue[AddressedMonitoringMessage]") -> None:
         try:
             router_keep_going = True
             while router_keep_going:
                 try:
                     data, addr = self.sock.recvfrom(2048)
-                    resource_msg = pickle.loads(data)
-                    self.logger.debug("Got UDP Message from {}: {}".format(addr, resource_msg))
-                    resource_msgs.put((resource_msg, addr))
+                    # resource_msg = pickle.loads(data)
+                    # self.logger.debug("Got UDP Message from {}: {}".format(addr, resource_msg))
+                    # resource_msgs.put((resource_msg, addr))
+                    msg = pickle.loads(data)
+                    self.logger.debug("Got UDP Message from {}: {}".format(addr, msg))
+                    if msg[0] == MessageType.RESOURCE_INFO:
+                        resource_msgs.put((msg, addr))
+                    elif msg[0] == MessageType.ENERGY_INFO:
+                        energy_msgs.put((msg, addr))
                 except socket.timeout:
                     pass
 
@@ -476,6 +505,8 @@ class MonitoringRouter:
                             block_msgs.put(msg_0)
                         elif msg[0] == MessageType.TASK_INFO:
                             priority_msgs.put(msg_0)
+                        elif msg[0] == MessageType.ENERGY_INFO:
+                            energy_msgs.put(msg_0)
                         elif msg[0] == MessageType.WORKFLOW_INFO:
                             priority_msgs.put(msg_0)
                             if 'exit_now' in msg[1] and msg[1]['exit_now']:
@@ -520,6 +551,7 @@ def router_starter(comm_q: "queue.Queue[Union[Tuple[int, int], str]]",
                    node_msgs: "queue.Queue[AddressedMonitoringMessage]",
                    block_msgs: "queue.Queue[AddressedMonitoringMessage]",
                    resource_msgs: "queue.Queue[AddressedMonitoringMessage]",
+                   energy_msgs: "queue.Queue[AddressedMonitoringMessage]",
 
                    hub_address: str,
                    hub_port: Optional[int],
@@ -544,7 +576,7 @@ def router_starter(comm_q: "queue.Queue[Union[Tuple[int, int], str]]",
 
         router.logger.info("Starting MonitoringRouter in router_starter")
         try:
-            router.start(priority_msgs, node_msgs, block_msgs, resource_msgs)
+            router.start(priority_msgs, node_msgs, block_msgs, resource_msgs, energy_msgs)
         except Exception as e:
             router.logger.exception("router.start exception")
             exception_q.put(('Hub', str(e)))

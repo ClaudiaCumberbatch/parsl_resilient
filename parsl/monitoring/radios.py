@@ -69,7 +69,7 @@ class FilesystemRadio(MonitoringRadio):
 
 class HTEXRadio(MonitoringRadio):
 
-    def __init__(self, monitoring_url: str, source_id: int, timeout: int = 10):
+    def __init__(self, monitoring_url: str, source_id: int | str, timeout: int = 10):
         """
         Parameters
         ----------
@@ -110,6 +110,7 @@ class HTEXRadio(MonitoringRadio):
 
         interchange_msg = {
             'type': 'monitoring',
+            'source': self.source_id,
             'payload': message
         }
 
@@ -143,6 +144,8 @@ class UDPRadio(MonitoringRadio):
             self.port = int(port)
         except Exception:
             raise Exception("Failed to parse monitoring url: {}".format(monitoring_url))
+        
+        logger.info(f"Initialized UDP Radio at {monitoring_url}")
 
         self.sock = socket.socket(socket.AF_INET,
                                   socket.SOCK_DGRAM,

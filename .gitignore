@@ -11,6 +11,7 @@ venv/*
 web/*
 api/*
 .idea/*
+runinfo/
 
 # local user configuration which should never be
 # version controlled

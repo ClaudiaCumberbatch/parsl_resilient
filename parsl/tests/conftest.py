@@ -175,6 +175,8 @@ def load_dfk_session(request, pytestconfig, tmpd_cwd_session):
 
     if config != 'local':
         spec = importlib.util.spec_from_file_location('', config)
+        # print("@", config)
+        # print("**", spec)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 

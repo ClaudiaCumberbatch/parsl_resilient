@@ -218,6 +218,7 @@ class DataFlowKernel:
                            'id', 'time_invoked', 'try_time_launched', 'time_returned', 'try_time_returned', 'executor']
 
         task_log_info = {"task_" + k: task_record[k] for k in info_to_monitor}
+        task_log_info["task_id"] = str(task_log_info["task_id"])
         task_log_info['run_id'] = self.run_id
         task_log_info['try_id'] = task_record['try_id']
         task_log_info['timestamp'] = datetime.datetime.now()
@@ -1116,6 +1117,12 @@ class DataFlowKernel:
             executor.run_dir = self.run_dir
             executor.hub_address = self.hub_address
             executor.hub_port = self.hub_interchange_port
+
+        if self.monitoring is not None:
+            executor.monitoring_hub_url = self.monitoring.monitoring_hub_url
+            executor.resource_monitoring_enabled = self.monitoring.resource_monitoring_enabled
+            executor.resource_monitoring_interval = self.monitoring.resource_monitoring_interval
+
             if hasattr(executor, 'provider'):
                 if hasattr(executor.provider, 'script_dir'):
                     executor.provider.script_dir = os.path.join(self.run_dir, 'submit_scripts')

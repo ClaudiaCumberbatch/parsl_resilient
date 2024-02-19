@@ -509,6 +509,11 @@ class Interchange:
             manager_id, *all_messages = self.results_incoming.recv_multipart()
             if manager_id not in self._ready_managers:
                 logger.warning("Received a result from a un-registered manager: {!r}".format(manager_id))
+                r = pickle.loads(all_messages[0])
+                if r['type'] == 'monitoring' and str(r['source']).encode('utf-8') in self._ready_managers:
+                    hub_channel.send_pyobj(r['payload'])
+                else:
+                    logger.warning("Received a result from a un-registered manager: {}".format(manager_id))
             else:
                 logger.debug(f"Got {len(all_messages)} result items in batch from manager {manager_id!r}")
 

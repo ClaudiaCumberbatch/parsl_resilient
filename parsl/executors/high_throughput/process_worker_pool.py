@@ -27,6 +27,8 @@ from parsl.app.errors import RemoteExceptionWrapper
 from parsl.executors.high_throughput.errors import WorkerLost
 from parsl.executors.high_throughput.probe import probe_addresses
 from parsl.multiprocessing import SpawnContext
+from parsl.multiprocessing import ForkProcess as mpForkProcess
+
 from parsl.serialize import unpack_apply_message, serialize
 
 HEARTBEAT_CODE = (2 ** 32) - 1
@@ -203,6 +205,10 @@ class Manager:
         if self.accelerators_available:
             self.worker_count = min(len(self.available_accelerators), self.worker_count)
         logger.info("Manager will spawn {} workers".format(self.worker_count))
+
+        # share the result queue with monitoring code so it too can send results down that channel
+        import parsl.executors.high_throughput.monitoring_info as mi
+        mi.result_queue = self.pending_result_queue
 
     def create_reg_message(self):
         """ Creates a registration message to identify the worker to the interchange
@@ -768,6 +774,14 @@ if __name__ == "__main__":
                         help="Whether/how workers should control CPU affinity.")
     parser.add_argument("--available-accelerators", type=str, nargs="*",
                         help="Names of available accelerators")
+    parser.add_argument("--monitor_resources", action='store_true',
+                        help="Report the resource utilization of the processes")
+    parser.add_argument("--monitoring_url", type=str, help="Monitoring hub url")
+    parser.add_argument("--run_id", type=str, help="Run id")
+    parser.add_argument("--radio_mode", type=str, choices=["udp", "htex", "filesystem", "fake"],
+                        help="Which radio to use to communicate with monitoring hub")
+    parser.add_argument("--sleep_dur", type=int, help="Sleep time in between monitoring")
+    parser.add_argument("--energy_monitor", type=str, help="Which energy monitor to use")
 
     args = parser.parse_args()
 
@@ -814,6 +828,35 @@ if __name__ == "__main__":
                           cpu_affinity=args.cpu_affinity,
                           available_accelerators=args.available_accelerators,
                           cert_dir=None if args.cert_dir == "None" else args.cert_dir)
+
+        if args.monitor_resources:
+            logger.info("Energy Monitor: {}".format(args.energy_monitor))
+            if args.energy_monitor:
+                logger.info("Setting up energy monitor")
+                import parsl.monitoring.energy.node_monitors as NodeEnergyMonitors
+                energy_monitor_cls = getattr(NodeEnergyMonitors, args.energy_monitor)
+                energy_monitor = energy_monitor_cls(debug=args.debug)
+            else:
+                energy_monitor = None
+
+            from parsl.monitoring.resource_monitor import resource_monitor_loop
+            terminate_event = multiprocessing.Event()
+
+            # This has to be done after the manager has been initialized so the htex radio works properly
+            monitor_process = mpForkProcess(target=resource_monitor_loop,
+                                            args=(args.monitoring_url,
+                                                    args.uid,
+                                                    args.run_id,
+                                                    args.radio_mode,
+                                                    logging.DEBUG if args.debug is True else logging.INFO,
+                                                    args.sleep_dur,
+                                                    args.logdir,  # TODO: Need to pass run dir fo fs radio
+                                                    args.block_id,
+                                                    energy_monitor,
+                                                    terminate_event),
+                                            daemon=True)
+            monitor_process.start()
+
         manager.start()
 
     except Exception:
@@ -822,3 +865,7 @@ if __name__ == "__main__":
     else:
         logger.info("Process worker pool exiting normally")
         print("Process worker pool exiting normally")
+    finally:
+        if args.monitor_resources:
+            terminate_event.set()
+            monitor_process.join()

@@ -12,7 +12,6 @@ from parsl.dataflow.states import States
 from parsl.errors import OptionalModuleMissing
 from parsl.monitoring.message_type import MessageType
 from parsl.monitoring.types import MonitoringMessage, TaggedMonitoringMessage
-from parsl.process_loggers import wrap_with_logs
 from parsl.utils import setproctitle
 
 logger = logging.getLogger("database_manager")
@@ -39,6 +38,7 @@ STATUS = 'status'        # Status table includes task status
 RESOURCE = 'resource'    # Resource table includes task resource utilization
 NODE = 'node'            # Node table include node info
 BLOCK = 'block'          # Block table include the status for block polling
+ENERGY = 'energy'
 
 
 class Database:
@@ -129,7 +129,7 @@ class Database:
 
     class Status(Base):
         __tablename__ = STATUS
-        task_id = Column(Integer, nullable=False)
+        task_id = Column(Text, nullable=False)  # Globus compute task id
         task_status_name = Column(Text, nullable=False)
         timestamp = Column(DateTime, nullable=False)
         run_id = Column(Text, sa.ForeignKey('workflow.run_id'), nullable=False)
@@ -141,7 +141,7 @@ class Database:
 
     class Task(Base):
         __tablename__ = TASK
-        task_id = Column('task_id', Integer, nullable=False)
+        task_id = Column('task_id', Text, nullable=False)  # Globus compute task id
         run_id = Column('run_id', Text, nullable=False)
         task_depends = Column('task_depends', Text, nullable=True)
         task_func_name = Column('task_func_name', Text, nullable=False)
@@ -169,11 +169,12 @@ class Database:
     class Try(Base):
         __tablename__ = TRY
         try_id = Column('try_id', Integer, nullable=False)
-        task_id = Column('task_id', Integer, nullable=False)
+        task_id = Column('task_id', Text, nullable=False)  # Globus compute task id
         run_id = Column('run_id', Text, nullable=False)
 
         block_id = Column('block_id', Text, nullable=True)
         hostname = Column('hostname', Text, nullable=True)
+        pid = Column('pid', Integer, nullable=True)
 
         task_executor = Column('task_executor', Text, nullable=False)
 
@@ -223,13 +224,15 @@ class Database:
 
     class Resource(Base):
         __tablename__ = RESOURCE
-        try_id = Column('try_id', Integer, nullable=False)
-        task_id = Column('task_id', Integer, nullable=False)
+        # try_id = Column('try_id', Integer, nullable=False)
+        # task_id = Column('task_id', Integer, nullable=False)
+        pid = Column('pid', Integer, nullable=False)
+        block_id = Column('block_id', Text, nullable=False)
         run_id = Column('run_id', Text, sa.ForeignKey(
             'workflow.run_id'), nullable=False)
         timestamp = Column('timestamp', DateTime, nullable=False)
-        resource_monitoring_interval = Column(
-            'resource_monitoring_interval', Float, nullable=True)
+        # resource_monitoring_interval = Column(
+        #     'resource_monitoring_interval', Float, nullable=True)
         psutil_process_pid = Column(
             'psutil_process_pid', Integer, nullable=True)
         psutil_process_memory_percent = Column(
@@ -250,8 +253,37 @@ class Database:
             'psutil_process_disk_write', Float, nullable=True)
         psutil_process_status = Column(
             'psutil_process_status', Text, nullable=True)
+        psutil_process_name = Column(
+            'psutil_process_name', Text, nullable=True)
+        psutil_process_ppid = Column(
+            'psutil_process_ppid', Text, nullable=True)
+
+        perf_unhalted_core_cycles = Column(
+            'perf_unhalted_core_cycles', BigInteger, nullable=True)
+        perf_unhalted_reference_cycles = Column(
+            'perf_unhalted_reference_cycles', BigInteger, nullable=True)
+        perf_llc_misses = Column(
+            'perf_llc_misses', BigInteger, nullable=True)
+        perf_instructions_retired = Column(
+            'perf_instructions_retired', BigInteger, nullable=True)
         __table_args__ = (
-            PrimaryKeyConstraint('try_id', 'task_id', 'run_id', 'timestamp'),
+            # PrimaryKeyConstraint('try_id', 'task_id', 'run_id', 'timestamp'),
+            PrimaryKeyConstraint('pid', 'block_id', 'run_id', 'timestamp'),
+        )
+
+    class Energy(Base):
+        __tablename__ = ENERGY
+        run_id = Column('run_id', Text, nullable=False)
+        block_id = Column('block_id', Text, nullable=False)
+        hostname = Column('hostname', Text, nullable=False)
+        timestamp = Column('timestamp', DateTime, nullable=False)
+        duration = Column('duration', Integer, nullable=False)
+        total_energy = Column('total_energy', Float, nullable=False)
+        resource_monitoring_interval = Column(
+            'resource_monitoring_interval', Float, nullable=True)
+        devices = Column('devices', Text, nullable=True)
+        __table_args__ = (
+            PrimaryKeyConstraint('run_id', 'block_id', 'timestamp'),
         )
 
 
@@ -285,12 +317,14 @@ class DatabaseManager:
         self.pending_node_queue = queue.Queue()  # type: queue.Queue[MonitoringMessage]
         self.pending_block_queue = queue.Queue()  # type: queue.Queue[MonitoringMessage]
         self.pending_resource_queue = queue.Queue()  # type: queue.Queue[MonitoringMessage]
+        self.pending_energy_queue = queue.Queue()  # type: queue.Queue[MonitoringMessage]
 
     def start(self,
               priority_queue: "queue.Queue[TaggedMonitoringMessage]",
               node_queue: "queue.Queue[MonitoringMessage]",
               block_queue: "queue.Queue[MonitoringMessage]",
-              resource_queue: "queue.Queue[MonitoringMessage]") -> None:
+              resource_queue: "queue.Queue[MonitoringMessage]",
+              energy_queue: "queue.Queue[MonitoringMessage]") -> None:
 
         self._kill_event = threading.Event()
         self._priority_queue_pull_thread = threading.Thread(target=self._migrate_logs_to_internal,
@@ -325,6 +359,13 @@ class DatabaseManager:
                                                             )
         self._resource_queue_pull_thread.start()
 
+        self._energy_queue_pull_thread = threading.Thread(target=self._migrate_logs_to_internal,
+                                                            args=(energy_queue, 'energy', self._kill_event,),
+                                                            name="Monitoring-migrate-energy",
+                                                            daemon=True,
+                                                        )
+        self._energy_queue_pull_thread.start()
+
         """
         maintain a set to track the tasks that are already INSERTed into database
         to prevent race condition that the first resource message (indicate 'running' state)
@@ -351,8 +392,10 @@ class DatabaseManager:
         while (not self._kill_event.is_set() or
                self.pending_priority_queue.qsize() != 0 or self.pending_resource_queue.qsize() != 0 or
                self.pending_node_queue.qsize() != 0 or self.pending_block_queue.qsize() != 0 or
+               self.pending_energy_queue.qsize() != 0 or
                priority_queue.qsize() != 0 or resource_queue.qsize() != 0 or
-               node_queue.qsize() != 0 or block_queue.qsize() != 0):
+               node_queue.qsize() != 0 or block_queue.qsize() != 0 or
+               energy_queue.qsize() != 0):
 
             """
             WORKFLOW_INFO and TASK_INFO messages (i.e. priority messages)
@@ -508,8 +551,8 @@ class DatabaseManager:
 
                     insert_resource_messages = []
                     for msg in resource_messages:
-                        task_try_id = str(msg['task_id']) + "." + str(msg['try_id'])
                         if msg['first_msg']:
+                            task_try_id = str(msg['task_id']) + "." + str(msg['try_id'])
                             # Update the running time to try table if first message
                             msg['task_status_name'] = States.running.name
                             msg['task_try_time_running'] = msg['timestamp']
@@ -538,18 +581,28 @@ class DatabaseManager:
                     self._update(table=TRY,
                                  columns=['task_try_time_running',
                                           'run_id', 'task_id', 'try_id',
-                                          'block_id', 'hostname'],
+                                          'block_id', 'hostname', 'pid'],
                                  messages=reprocessable_first_resource_messages)
 
                 if reprocessable_last_resource_messages:
                     self._insert(table=STATUS, messages=reprocessable_last_resource_messages)
+
+                """
+                Energy Info Messages
+                """
+                energy_info_messages = self._get_messages_in_batch(self.pending_energy_queue) # 这玩意是空的可能说明queue里面没有东西
+                if energy_info_messages:
+                    logger.debug(
+                        "Got {} messages from energy queue".format(len(energy_info_messages)))
+                    self._insert(table=ENERGY, messages=energy_info_messages)
+
             except Exception:
                 logger.exception("Exception in db loop: this might have been a malformed message, or some other error. monitoring data may have been lost")
                 exception_happened = True
         if exception_happened:
             raise RuntimeError("An exception happened sometime during database processing and should have been logged in database_manager.log")
 
-    @wrap_with_logs(target="database_manager")
+    # @wrap_with_logs(target="database_manager")
     def _migrate_logs_to_internal(self, logs_queue: queue.Queue, queue_tag: str, kill_event: threading.Event) -> None:
         logger.info("Starting processing for queue {}".format(queue_tag))
 
@@ -579,6 +632,8 @@ class DatabaseManager:
                     assert x[0] == MessageType.NODE_INFO, "_migrate_logs_to_internal can only migrate NODE_INFO messages from node queue"
 
                     self._dispatch_to_internal(x)
+                elif queue_tag == 'energy':
+                    self._dispatch_to_internal(x)
                 elif queue_tag == "block":
                     self._dispatch_to_internal(x)
                 else:
@@ -595,6 +650,9 @@ class DatabaseManager:
 
             logger.info("Will put {} to pending node queue".format(x[1]))
             self.pending_node_queue.put(x[1])
+        elif x[0] == MessageType.ENERGY_INFO:
+            logger.info("Will put {} to pending energy queue".format(x[1]))
+            self.pending_energy_queue.put(x[1])
         elif x[0] == MessageType.BLOCK_INFO:
             logger.info("Will put {} to pending block queue".format(x[1]))
             self.pending_block_queue.put(x[-1])
@@ -636,6 +694,7 @@ class DatabaseManager:
             done = False
             while not done:
                 try:
+                    logger.info("Message {} table {}".format(messages, table)) # for debug
                     self.db.insert(table=table, messages=messages)
                     done = True
                 except sa.exc.OperationalError as e:
@@ -690,12 +749,13 @@ class DatabaseManager:
         self._kill_event.set()
 
 
-@wrap_with_logs(target="database_manager")
+# @wrap_with_logs(target="database_manager")
 def dbm_starter(exception_q: "queue.Queue[Tuple[str, str]]",
                 priority_msgs: "queue.Queue[TaggedMonitoringMessage]",
                 node_msgs: "queue.Queue[MonitoringMessage]",
                 block_msgs: "queue.Queue[MonitoringMessage]",
                 resource_msgs: "queue.Queue[MonitoringMessage]",
+                energy_msgs: "queue.Queue[MonitoringMessage]",
                 db_url: str,
                 logdir: str,
                 logging_level: int) -> None:
@@ -711,7 +771,7 @@ def dbm_starter(exception_q: "queue.Queue[Tuple[str, str]]",
                               logdir=logdir,
                               logging_level=logging_level)
         logger.info("Starting dbm in dbm starter")
-        dbm.start(priority_msgs, node_msgs, block_msgs, resource_msgs)
+        dbm.start(priority_msgs, node_msgs, block_msgs, resource_msgs, energy_msgs)
     except KeyboardInterrupt:
         logger.exception("KeyboardInterrupt signal caught")
         dbm.close()

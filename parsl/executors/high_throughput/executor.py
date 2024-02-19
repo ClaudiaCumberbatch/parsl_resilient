@@ -6,6 +6,7 @@ import threading
 import queue
 import datetime
 import pickle
+import uuid
 from multiprocessing import Queue
 from typing import Dict, Sequence
 from typing import List, Optional, Tuple, Union, Callable
@@ -28,14 +29,17 @@ from parsl.providers.base import ExecutionProvider
 from parsl.data_provider.staging import Staging
 from parsl.addresses import get_all_addresses
 from parsl.process_loggers import wrap_with_logs
-
 from parsl.multiprocessing import ForkProcess
 from parsl.utils import RepresentationMixin
 from parsl.providers import LocalProvider
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_LAUNCH_CMD = ("process_worker_pool.py {debug} {max_workers} "
+DEFAULT_LAUNCH_CMD = ("PARSL_MONITORING_HUB_URL={url} "
+                      "PARSL_MONITORING_RADIO_MODE={radio_mode} "
+                      "PARSL_RUN_ID={run_id} "
+                      "PARSL_RUN_DIR={rundir} "
+                      "process_worker_pool.py {debug} {max_workers} "
                       "-a {addresses} "
                       "-p {prefetch_capacity} "
                       "-c {cores_per_worker} "
@@ -50,7 +54,14 @@ DEFAULT_LAUNCH_CMD = ("process_worker_pool.py {debug} {max_workers} "
                       "{address_probe_timeout_string} "
                       "--hb_threshold={heartbeat_threshold} "
                       "--cpu-affinity {cpu_affinity} "
-                      "--available-accelerators {accelerators}")
+                      "--available-accelerators {accelerators}"
+                      "--uid {{uid}} "
+                      "{monitor_resources} "
+                      "--monitoring_url {url} "
+                      "--run_id {run_id} "
+                      "--radio_mode {radio_mode} "
+                      "--sleep_dur {sleep_dur} "
+                      "{energy_monitor}")
 
 
 class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
@@ -214,6 +225,7 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                  max_workers: Union[int, float] = float('inf'),
                  cpu_affinity: str = 'none',
                  available_accelerators: Union[int, Sequence[str]] = (),
+                 start_method: str = 'spawn',
                  prefetch_capacity: int = 0,
                  heartbeat_threshold: int = 120,
                  heartbeat_period: int = 30,
@@ -221,7 +233,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                  address_probe_timeout: Optional[int] = None,
                  worker_logdir_root: Optional[str] = None,
                  block_error_handler: Union[bool, Callable[[BlockProviderExecutor, Dict[str, JobStatus]], None]] = True,
-                 encrypted: bool = False):
+                 encrypted: bool = False,
+                 energy_monitor: Optional[str] = None):
 
         logger.debug("Initializing HighThroughputExecutor")
 
@@ -236,6 +249,7 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         self.prefetch_capacity = prefetch_capacity
         self.address = address
         self.address_probe_timeout = address_probe_timeout
+        self.start_method = start_method
         if self.address:
             self.all_addresses = address
         else:
@@ -285,6 +299,10 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
             launch_cmd = DEFAULT_LAUNCH_CMD
         self.launch_cmd = launch_cmd
 
+        self.resource_monitoring_enabled = False
+        self.energy_monitor = energy_monitor
+        self.monitor_energy = (energy_monitor is not None)
+
     radio_mode = "htex"
 
     @property
@@ -302,6 +320,9 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         """
         debug_opts = "--debug" if self.worker_debug else ""
         max_workers = "" if self.max_workers == float('inf') else "--max_workers={}".format(self.max_workers)
+
+        monitor_resources = "--monitor_resources" if self.resource_monitoring_enabled else ""
+        energy_monitor = f"--energy_monitor {self.energy_monitor}" if self.monitor_energy else ""
 
         address_probe_timeout_string = ""
         if self.address_probe_timeout:
@@ -323,7 +344,14 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                                        cert_dir=self.cert_dir,
                                        logdir=self.worker_logdir,
                                        cpu_affinity=self.cpu_affinity,
-                                       accelerators=" ".join(self.available_accelerators))
+                                       accelerators=" ".join(self.available_accelerators),
+                                       monitor_resources=monitor_resources,
+                                       url="fake" if not monitor_resources else self.monitoring_hub_url,
+                                       run_id="0" if not self.run_id else self.run_id,
+                                       radio_mode="fake" if not self.radio_mode else self.radio_mode,
+                                       rundir=self.run_dir,
+                                       sleep_dur= 0 if not monitor_resources else self.resource_monitoring_interval,
+                                       energy_monitor=energy_monitor,)
         self.launch_cmd = l_cmd
         logger.debug("Launch command: {}".format(self.launch_cmd))
 
@@ -719,7 +747,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
     def _get_launch_command(self, block_id: str) -> str:
         if self.launch_cmd is None:
             raise ScalingFailed(self, "No launch command")
-        launch_cmd = self.launch_cmd.format(block_id=block_id)
+        uid = str(uuid.uuid4()).split('-')[-1]
+        launch_cmd = self.launch_cmd.format(block_id=block_id, uid=uid)
         return launch_cmd
 
     def status(self) -> Dict[str, JobStatus]:

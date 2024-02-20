@@ -13,7 +13,7 @@ def this_app():
     # period configured in the test configuration, so that some
     # messages are actually sent - there is no guarantee that any
     # (non-first) resource message will be sent at all for a short app.
-    time.sleep(3)
+    time.sleep(10)
 
     return 5
 

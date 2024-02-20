@@ -50,7 +50,7 @@ def measure_resource_utilization(run_id: str,
     d['first_msg'] = False
     d['last_msg'] = False
     d['timestamp'] = datetime.datetime.now()
-    d["psutil_process_name"] = proc.info["name"]
+    d["psutil_process_name"] = proc.info["name"].encode('utf-8','surrogatepass').decode('utf-8')
     d["psutil_process_ppid"] = proc.info["ppid"]
 
     if not profiler:
@@ -206,7 +206,7 @@ def resource_monitor_loop(monitoring_hub_url: str,
 
     while not terminate_event.is_set():
         logger.debug("start of monitoring loop")
-        for proc in psutil.process_iter(['pid', 'username', 'name', 'ppid']):
+        for proc in psutil.process_iter(['pid', 'username', 'name', 'ppid']): # traverse
             if proc.info["username"] != user_name or proc.info["pid"] == os.getpid():
                 continue
 

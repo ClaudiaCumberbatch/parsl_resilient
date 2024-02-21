@@ -694,7 +694,6 @@ class DatabaseManager:
             done = False
             while not done:
                 try:
-                    logger.info("Message {} table {}".format(messages, table)) # for debug
                     self.db.insert(table=table, messages=messages)
                     done = True
                 except sa.exc.OperationalError as e:

@@ -10,7 +10,7 @@ import json
 from functools import wraps
 
 from parsl.multiprocessing import ForkProcess
-from multiprocessing import Event, Barrier
+from multiprocessing import Event, Barrier, Queue
 from parsl.process_loggers import wrap_with_logs
 from parsl.utils import setproctitle
 
@@ -172,7 +172,8 @@ def resource_monitor_loop(monitoring_hub_url: str,
             run_dir: str,
             block_id: int,
             energy_monitor: None | NodeEnergyMonitor,
-            terminate_event: Any) -> None:  # cannot be Event/Barrier because of multiprocessing type weirdness.
+            terminate_event: Any,
+            procQueue: Queue) -> None:  # cannot be Event/Barrier because of multiprocessing type weirdness.
     """Monitors the Parsl task's resources by pointing psutil to the task's pid and watching it and its children.
     """
 
@@ -204,10 +205,27 @@ def resource_monitor_loop(monitoring_hub_url: str,
     
     next_send = time.time()
 
+    def check_queue_contents(q, target):
+        temp_list = []
+        res = False
+        while not q.empty():
+            item = q.get()
+            logger.info("pid {}".format(item)) 
+            temp_list.append(item)
+            if item == target:
+                res = True
+                break
+        
+        for item in temp_list:
+            q.put(item)
+        return res
+
     while not terminate_event.is_set():
         logger.debug("start of monitoring loop")
         for proc in psutil.process_iter(['pid', 'username', 'name', 'ppid']): # traverse
-            if proc.info["username"] != user_name or proc.info["pid"] == os.getpid():
+            logger.info("@@Monitoring process: {} {}".format(proc.info["pid"], proc.info["name"])) 
+            if proc.info["username"] != user_name or proc.info["pid"] == os.getpid() or not check_queue_contents(procQueue, proc.info["pid"]):
+            # if proc.info["username"] != user_name or proc.info["pid"] == os.getpid():
                 continue
 
             if _perf_counters_enabled and proc.info["pid"] not in profilers:

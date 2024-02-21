@@ -361,7 +361,7 @@ class Manager:
         logger.critical("Exiting")
 
     @wrap_with_logs
-    def worker_watchdog(self, kill_event: threading.Event):
+    def worker_watchdog(self, kill_event: threading.Event, procQueue: multiprocessing.Queue):
         """Keeps workers alive.
 
         Parameters:
@@ -391,6 +391,7 @@ class Manager:
 
                     p = self._start_worker(worker_id)
                     self.procs[worker_id] = p
+                    procQueue.put(p.pid)
                     logger.info("Worker {} has been restarted".format(worker_id))
 
         logger.critical("Exiting")
@@ -425,7 +426,7 @@ class Manager:
 
         logger.critical("Exiting")
 
-    def start(self):
+    def start(self, procQueue: multiprocessing.Queue):
         """ Start the worker processes.
 
         TODO: Move task receiving to a thread
@@ -438,6 +439,7 @@ class Manager:
         for worker_id in range(self.worker_count):
             p = self._start_worker(worker_id)
             self.procs[worker_id] = p
+            procQueue.put(p.pid)
 
         logger.debug("Workers started")
 
@@ -448,7 +450,7 @@ class Manager:
                                                       args=(self._kill_event,),
                                                       name="Result-Pusher")
         self._worker_watchdog_thread = threading.Thread(target=self.worker_watchdog,
-                                                        args=(self._kill_event,),
+                                                        args=(self._kill_event, procQueue),
                                                         name="worker-watchdog")
         self._monitoring_handler_thread = threading.Thread(target=self.handle_monitoring_messages,
                                                            args=(self._kill_event,),
@@ -843,6 +845,8 @@ if __name__ == "__main__":
             terminate_event = multiprocessing.Event()
 
             # This has to be done after the manager has been initialized so the htex radio works properly
+            # declare a Queue to pass proc
+            procQueue = multiprocessing.Queue()
             monitor_process = mpForkProcess(target=resource_monitor_loop,
                                             args=(args.monitoring_url,
                                                     args.uid,
@@ -853,11 +857,12 @@ if __name__ == "__main__":
                                                     args.logdir,  # TODO: Need to pass run dir fo fs radio
                                                     args.block_id,
                                                     energy_monitor,
-                                                    terminate_event),
+                                                    terminate_event,
+                                                    procQueue),
                                             daemon=True)
             monitor_process.start()
 
-        manager.start()
+        manager.start(procQueue)
 
     except Exception:
         logger.critical("Process worker pool exiting with an exception", exc_info=True)

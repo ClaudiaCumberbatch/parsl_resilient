@@ -9,7 +9,7 @@ from multiprocessing import Event, Barrier
 from parsl.process_loggers import wrap_with_logs
 
 from parsl.monitoring.message_type import MessageType
-from parsl.monitoring.radios import MonitoringRadio, UDPRadio, HTEXRadio, FilesystemRadio
+from parsl.monitoring.radios import MonitoringRadio, UDPRadio, HTEXRadio, FilesystemRadio, DiasporaRadio
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,9 @@ def send_first_last_message(try_id: int,
     elif radio_mode == "filesystem":
         radio = FilesystemRadio(monitoring_url=monitoring_hub_url,
                                 source_id=task_id, run_dir=run_dir)
+    elif radio_mode == "diaspora":
+        radio = DiasporaRadio(monitoring_hub_url,
+                              source_id=task_id)
     else:
         raise RuntimeError(f"Unknown radio mode: {radio_mode}")
 

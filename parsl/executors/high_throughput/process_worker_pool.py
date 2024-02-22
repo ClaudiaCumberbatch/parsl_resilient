@@ -780,7 +780,7 @@ if __name__ == "__main__":
                         help="Report the resource utilization of the processes")
     parser.add_argument("--monitoring_url", type=str, help="Monitoring hub url")
     parser.add_argument("--run_id", type=str, help="Run id")
-    parser.add_argument("--radio_mode", type=str, choices=["udp", "htex", "filesystem", "fake"],
+    parser.add_argument("--radio_mode", type=str, choices=["udp", "htex", "filesystem", "fake", "diaspora"],
                         help="Which radio to use to communicate with monitoring hub")
     parser.add_argument("--sleep_dur", type=int, help="Sleep time in between monitoring")
     parser.add_argument("--energy_monitor", type=str, help="Which energy monitor to use")

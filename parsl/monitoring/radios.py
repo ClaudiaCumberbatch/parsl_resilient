@@ -1,7 +1,9 @@
+import datetime
 import os
 import socket
 import pickle
 import uuid
+import json
 import logging
 
 from abc import ABCMeta, abstractmethod
@@ -20,6 +22,34 @@ class MonitoringRadio(metaclass=ABCMeta):
     @abstractmethod
     def send(self, message: object) -> None:
         pass
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime.datetime, datetime.date, datetime.time)):
+            return obj.isoformat()
+        return super(DateTimeEncoder, self).default(obj)
+
+class DiasporaRadio(MonitoringRadio):
+    def __init__(self, monitoring_url: str, source_id: int, timeout: int = 10):
+        from diaspora_event_sdk import KafkaProducer
+        self.source_id = source_id
+        self.producer = KafkaProducer(value_serializer=DiasporaRadio.serialize)
+        logger.info("Diaspora-based monitoring channel initializing")
+
+    def send(self, message: object) -> None:
+        msg_type = message[0]
+        topic = "radio-test"
+        key = "payload".encode("utf-8")
+        logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}")
+        self.producer.send(topic=topic, key=key, value=message[1])
+        # self.producer.send(topic=topic, key=key, value=b'msg')
+        # self.producer.send(topic, {'message': 'Synchronous message sent from Diaspora SDK'})
+        logger.info(f"Sent message")
+        return
+    
+    @staticmethod
+    def serialize(value):
+        return json.dumps(value, cls=DateTimeEncoder).encode("utf-8")
 
 
 class FilesystemRadio(MonitoringRadio):

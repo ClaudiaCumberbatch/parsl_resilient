@@ -16,7 +16,7 @@ from parsl.utils import setproctitle
 
 from parsl.monitoring.message_type import MessageType
 from parsl.monitoring.energy.base import NodeEnergyMonitor
-from parsl.monitoring.radios import MonitoringRadio, UDPRadio, HTEXRadio, FilesystemRadio
+from parsl.monitoring.radios import MonitoringRadio, UDPRadio, HTEXRadio, FilesystemRadio, DiasporaRadio
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 try:
@@ -193,6 +193,9 @@ def resource_monitor_loop(monitoring_hub_url: str,
     elif radio_mode == "filesystem":
         radio = FilesystemRadio(monitoring_url=monitoring_hub_url,
                                 source_id=manager_id, run_dir=run_dir)
+    elif radio_mode == "diaspora":
+        radio = DiasporaRadio(monitoring_url=monitoring_hub_url,
+                                source_id=manager_id)
     else:
         raise RuntimeError(f"Unknown radio mode: {radio_mode}")
 
@@ -223,7 +226,6 @@ def resource_monitor_loop(monitoring_hub_url: str,
     while not terminate_event.is_set():
         logger.debug("start of monitoring loop")
         for proc in psutil.process_iter(['pid', 'username', 'name', 'ppid']): # traverse
-            logger.info("@@Monitoring process: {} {}".format(proc.info["pid"], proc.info["name"])) 
             if proc.info["username"] != user_name or proc.info["pid"] == os.getpid() or not check_queue_contents(procQueue, proc.info["pid"]):
             # if proc.info["username"] != user_name or proc.info["pid"] == os.getpid():
                 continue

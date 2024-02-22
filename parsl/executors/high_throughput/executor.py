@@ -303,7 +303,7 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         self.energy_monitor = energy_monitor
         self.monitor_energy = (energy_monitor is not None)
 
-    radio_mode = "htex"
+    radio_mode = "diaspora"
 
     @property
     def logdir(self):
@@ -348,7 +348,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                                        monitor_resources=monitor_resources,
                                        url="fake" if not monitor_resources else self.monitoring_hub_url,
                                        run_id="0" if not self.run_id else self.run_id,
-                                       radio_mode="fake" if not self.radio_mode else self.radio_mode,
+                                    #    radio_mode="fake" if not self.radio_mode else self.radio_mode,
+                                       radio_mode="diaspora",
                                        rundir=self.run_dir,
                                        sleep_dur= 0 if not monitor_resources else self.resource_monitoring_interval,
                                        energy_monitor=energy_monitor,)

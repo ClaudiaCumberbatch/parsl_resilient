@@ -213,7 +213,6 @@ def resource_monitor_loop(monitoring_hub_url: str,
         res = False
         while not q.empty():
             item = q.get()
-            logger.info("pid {}".format(item)) 
             temp_list.append(item)
             if item == target:
                 res = True

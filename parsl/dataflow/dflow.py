@@ -947,7 +947,6 @@ class DataFlowKernel:
         else:
             raise ValueError("Task {} supplied invalid type for executors: {}".format(task_id, type(executors)))
         executor = random.choice(choices)
-        logger.debug("number of executors = {}".format(len(executor)))
         logger.debug("Task {} will be sent to executor {}".format(task_id, executor))
 
         # The below uses func.__name__ before it has been wrapped by any staging code.
@@ -1113,16 +1112,18 @@ class DataFlowKernel:
         channel.makedirs(channel.script_dir, exist_ok=True)
 
     def add_executors(self, executors):
+        logger.debug("inside add")
         for executor in executors:
+            logger.debug("inside loop, {}".format(executor))
             executor.run_id = self.run_id
             executor.run_dir = self.run_dir
             executor.hub_address = self.hub_address
             executor.hub_port = self.hub_interchange_port
 
-        if self.monitoring is not None:
-            executor.monitoring_hub_url = self.monitoring.monitoring_hub_url
-            executor.resource_monitoring_enabled = self.monitoring.resource_monitoring_enabled
-            executor.resource_monitoring_interval = self.monitoring.resource_monitoring_interval
+            if self.monitoring is not None:
+                executor.monitoring_hub_url = self.monitoring.monitoring_hub_url
+                executor.resource_monitoring_enabled = self.monitoring.resource_monitoring_enabled
+                executor.resource_monitoring_interval = self.monitoring.resource_monitoring_interval
 
             if hasattr(executor, 'provider'):
                 if hasattr(executor.provider, 'script_dir'):
@@ -1145,6 +1146,7 @@ class DataFlowKernel:
                 msg = executor.create_monitoring_info(new_status)
                 logger.debug("Sending monitoring message {} to hub from DFK".format(msg))
                 self.monitoring.send(MessageType.BLOCK_INFO, msg)
+
         block_executors = [e for e in executors if isinstance(e, BlockProviderExecutor)]
         self.job_status_poller.add_executors(block_executors)
 

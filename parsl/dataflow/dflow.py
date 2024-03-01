@@ -11,6 +11,7 @@ import inspect
 import threading
 import sys
 import datetime
+import parsl.monitoring.radios as radios
 from getpass import getuser
 from typeguard import typechecked
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -210,6 +211,16 @@ class DataFlowKernel:
             task_log_info = self._create_task_log_info(task_record)
             self.monitoring.send(MessageType.TASK_INFO, task_log_info)
 
+    def _send_failure_info(self, task_record: TaskRecord) -> None:
+        task_log_info = self._create_task_log_info(task_record)
+        radio: radios.MonitoringRadio
+        executor_label = task_record["executor"]
+        executor = self.executors[executor_label]
+        radio = radios.get_monitoring_radio(self.monitoring.monitoring_hub_url, task_record['id'], executor.radio_mode, self.run_dir)
+
+        msg = (MessageType.FAILURE_INFO, task_log_info)
+        radio.send(msg)
+
     def _create_task_log_info(self, task_record):
         """
         Create the dictionary that will be included in the log.
@@ -333,7 +344,7 @@ class DataFlowKernel:
                 with task_record['app_fu']._update_lock:
                     task_record['app_fu'].set_exception(e)
 
-            elif task_record['fail_cost'] <= self._config.retries:
+            elif task_record['fail_cost'] <= self._config.retries: # only retry place
 
                 # record the final state for this try before we mutate for retries
                 self.update_task_state(task_record, States.fail_retryable)
@@ -348,13 +359,14 @@ class DataFlowKernel:
 
                 logger.info("Task {} marked for retry".format(task_id))
 
-            else:
+            else: # run out of retry, fail
                 logger.exception("Task {} failed after {} retry attempts".format(task_id,
                                                                                  task_record['try_id']))
                 task_record['time_returned'] = datetime.datetime.now()
                 self.update_task_state(task_record, States.failed)
                 task_record['time_returned'] = datetime.datetime.now()
                 self._send_task_log_info(task_record)
+                self._send_failure_info(task_record)
                 with task_record['app_fu']._update_lock:
                     task_record['app_fu'].set_exception(e)
 
@@ -1112,9 +1124,7 @@ class DataFlowKernel:
         channel.makedirs(channel.script_dir, exist_ok=True)
 
     def add_executors(self, executors):
-        logger.debug("inside add")
         for executor in executors:
-            logger.debug("inside loop, {}".format(executor))
             executor.run_id = self.run_id
             executor.run_dir = self.run_dir
             executor.hub_address = self.hub_address

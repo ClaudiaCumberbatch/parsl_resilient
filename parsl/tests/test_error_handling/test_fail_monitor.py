@@ -3,26 +3,17 @@ import os
 import parsl
 import pytest
 
+from parsl.app.app import python_app
+
 logger = logging.getLogger(__name__)
 
-
-@parsl.python_app
-def this_app():
-    # this delay needs to be several times the resource monitoring
-    # period configured in the test configuration, so that some
-    # messages are actually sent - there is no guarantee that any
-    # (non-first) resource message will be sent at all for a short app.
-    import time
-    time.sleep(3)
-
-    return 5
+@python_app
+def always_fail():
+    raise ValueError("This ValueError should propagate to the app caller in fut.result()")
 
 @pytest.mark.local
-def test_energy_collection():
-    # this is imported here rather than at module level because
-    # it isn't available in a plain parsl install, so this module
-    # would otherwise fail to import and break even a basic test
-    # run.
+def test_simple():
+
     import sqlalchemy
     from sqlalchemy import text
     from parsl.tests.configs.htex_local_energy import fresh_config
@@ -35,7 +26,9 @@ def test_energy_collection():
     parsl.load(fresh_config())
 
     logger.info("invoking and waiting for result")
-    assert this_app().result() == 5
+    with pytest.raises(ValueError):
+        fut = always_fail()
+        fut.result()
 
     logger.info("cleaning up parsl")
     parsl.dfk().cleanup()
@@ -53,6 +46,3 @@ def test_energy_collection():
         # assert c >= 1
 
     logger.info("all done")
-
-if __name__ == "__main__":
-    test_energy_collection()

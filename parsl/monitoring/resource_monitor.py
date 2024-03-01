@@ -7,6 +7,7 @@ import platform
 import psutil
 import getpass
 import json
+import parsl.monitoring.radios as radios
 from functools import wraps
 
 from parsl.multiprocessing import ForkProcess
@@ -16,7 +17,6 @@ from parsl.utils import setproctitle
 
 from parsl.monitoring.message_type import MessageType
 from parsl.monitoring.energy.base import NodeEnergyMonitor
-from parsl.monitoring.radios import MonitoringRadio, UDPRadio, HTEXRadio, FilesystemRadio, DiasporaRadio
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 try:
@@ -183,21 +183,8 @@ def resource_monitor_loop(monitoring_hub_url: str,
                                    level=logging.DEBUG)
     logger.warning("Starting resource monitor!")
 
-    radio: MonitoringRadio
-    if radio_mode == "udp":
-        radio = UDPRadio(monitoring_hub_url,
-                         source_id=manager_id)
-    elif radio_mode == "htex":
-        radio = HTEXRadio(monitoring_hub_url,
-                          source_id=manager_id)
-    elif radio_mode == "filesystem":
-        radio = FilesystemRadio(monitoring_url=monitoring_hub_url,
-                                source_id=manager_id, run_dir=run_dir)
-    elif radio_mode == "diaspora":
-        radio = DiasporaRadio(monitoring_url=monitoring_hub_url,
-                                source_id=manager_id)
-    else:
-        raise RuntimeError(f"Unknown radio mode: {radio_mode}")
+    radio: radios.MonitoringRadio
+    radio = radios.get_monitoring_radio(monitoring_hub_url, manager_id, radio_mode, run_dir)
 
     logger.info("start of monitor")
     logger.info("Energy Monitor: {}".format(energy_monitor))

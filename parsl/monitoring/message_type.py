@@ -18,5 +18,8 @@ class MessageType(Enum):
     # Reports of the block info
     BLOCK_INFO = 4
 
-    # Reporrt of node-leevel energy information
+    # Reports of node-leevel energy information
     ENERGY_INFO = 5
+
+    # Reports of failure information
+    FAILURE_INFO = 6

@@ -5,6 +5,7 @@ import pickle
 import uuid
 import json
 import logging
+from parsl.monitoring.message_type import MessageType
 
 from abc import ABCMeta, abstractmethod
 
@@ -38,12 +39,19 @@ class DiasporaRadio(MonitoringRadio):
 
     def send(self, message: object) -> None:
         msg_type = message[0]
-        topic = "radio-test"
-        key = "payload".encode("utf-8")
-        logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}")
+        # TODO: make configurable
+        if msg_type == MessageType.FAILURE_INFO:
+            logger.info("got a fail type")
+            topic = "failure-info"
+        else:
+            topic = "radio-test"
+        if 'run_id' in message[1]:
+            key = message[1]['run_id'].encode("utf-8")
+        else:
+            logger.info("set key as init")
+            key = b"init"
+        logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
         self.producer.send(topic=topic, key=key, value=message[1])
-        # self.producer.send(topic=topic, key=key, value=b'msg')
-        # self.producer.send(topic, {'message': 'Synchronous message sent from Diaspora SDK'})
         logger.info(f"Sent message")
         return
     
@@ -206,3 +214,16 @@ class UDPRadio(MonitoringRadio):
             logging.error("Could not send message within timeout limit")
             return
         return
+
+
+def get_monitoring_radio(monitoring_url: str, source_id: int, radio_mode: str, run_dir: str) -> MonitoringRadio:
+    if radio_mode == "udp":
+        return UDPRadio(monitoring_url, source_id)
+    elif radio_mode == "htex":
+        return HTEXRadio(monitoring_url, source_id)
+    elif radio_mode == "filesystem":
+        return FilesystemRadio(monitoring_url=monitoring_url, source_id=source_id, run_dir=run_dir)
+    elif radio_mode == "diaspora":
+        return DiasporaRadio(monitoring_url, source_id)
+    else:
+        raise ValueError(f"Unknown radio mode {radio_mode}")

@@ -50,7 +50,7 @@ class DiasporaRadio(MonitoringRadio):
         else:
             logger.info("set key as init")
             key = b"init"
-        logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
+        # logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
         self.producer.send(topic=topic, key=key, value=message[1])
         logger.info(f"Sent message")
         return

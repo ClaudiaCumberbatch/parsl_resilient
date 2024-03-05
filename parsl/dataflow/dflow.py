@@ -366,7 +366,8 @@ class DataFlowKernel:
                 self.update_task_state(task_record, States.failed)
                 task_record['time_returned'] = datetime.datetime.now()
                 self._send_task_log_info(task_record)
-                self._send_failure_info(task_record)
+                if self.monitoring:
+                    self._send_failure_info(task_record)
                 with task_record['app_fu']._update_lock:
                     task_record['app_fu'].set_exception(e)
 

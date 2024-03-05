@@ -50,7 +50,7 @@ class Database:
     Base = declarative_base()
 
     def __init__(self,
-                 url: str = 'sqlite:///runinfomonitoring.db',
+                 url: str = 'sqlite:///runinfo/monitoring.db',
                  ):
 
         self.eng = sa.create_engine(url)

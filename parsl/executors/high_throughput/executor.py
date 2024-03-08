@@ -234,7 +234,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                  worker_logdir_root: Optional[str] = None,
                  block_error_handler: Union[bool, Callable[[BlockProviderExecutor, Dict[str, JobStatus]], None]] = True,
                  encrypted: bool = False,
-                 energy_monitor: Optional[str] = None):
+                 energy_monitor: Optional[str] = None,
+                 radio_mode: str = "diaspora",):
 
         logger.debug("Initializing HighThroughputExecutor")
 
@@ -303,7 +304,7 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         self.energy_monitor = energy_monitor
         self.monitor_energy = (energy_monitor is not None)
 
-    radio_mode = "diaspora"
+    # radio_mode = "diaspora"
 
     @property
     def logdir(self):

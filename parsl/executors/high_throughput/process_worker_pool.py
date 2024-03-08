@@ -361,7 +361,9 @@ class Manager:
         logger.critical("Exiting")
 
     @wrap_with_logs
-    def worker_watchdog(self, kill_event: threading.Event, procQueue: multiprocessing.Queue):
+    def worker_watchdog(self, 
+                        kill_event: threading.Event, 
+                        procQueue: Optional[multiprocessing.Queue] = None):
         """Keeps workers alive.
 
         Parameters:
@@ -391,7 +393,8 @@ class Manager:
 
                     p = self._start_worker(worker_id)
                     self.procs[worker_id] = p
-                    procQueue.put(p.pid)
+                    if procQueue:
+                        procQueue.put(p.pid)
                     logger.info("Worker {} has been restarted".format(worker_id))
 
         logger.critical("Exiting")
@@ -426,7 +429,8 @@ class Manager:
 
         logger.critical("Exiting")
 
-    def start(self, procQueue: multiprocessing.Queue):
+    def start(self, 
+              procQueue: Optional[multiprocessing.Queue] = None):
         """ Start the worker processes.
 
         TODO: Move task receiving to a thread
@@ -439,7 +443,8 @@ class Manager:
         for worker_id in range(self.worker_count):
             p = self._start_worker(worker_id)
             self.procs[worker_id] = p
-            procQueue.put(p.pid)
+            if procQueue:
+                procQueue.put(p.pid)
 
         logger.debug("Workers started")
 
@@ -861,8 +866,9 @@ if __name__ == "__main__":
                                                     procQueue),
                                             daemon=True)
             monitor_process.start()
-
-        manager.start(procQueue)
+            manager.start(procQueue)
+        else:
+            manager.start()
 
     except Exception:
         logger.critical("Process worker pool exiting with an exception", exc_info=True)

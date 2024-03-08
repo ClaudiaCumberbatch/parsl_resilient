@@ -220,6 +220,8 @@ class DataFlowKernel:
 
         msg = (MessageType.FAILURE_INFO, task_log_info)
         radio.send(msg)
+        if isinstance(radio, radios.DiasporaRadio):
+            radio.flush()
 
     def _create_task_log_info(self, task_record):
         """

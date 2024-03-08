@@ -249,3 +249,6 @@ def resource_monitor_loop(monitoring_hub_url: str,
         logger.debug("sleeping")
         terminate_event.wait(max(0, next_send - time.time()))
         next_send += sleep_dur
+
+    if isinstance(radio, radios.DiasporaRadio):
+        radio.flush()

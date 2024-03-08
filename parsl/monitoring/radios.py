@@ -55,6 +55,10 @@ class DiasporaRadio(MonitoringRadio):
         logger.info(f"Sent message")
         return
     
+    def flush(self):
+        self.producer.flush()
+        return
+    
     @staticmethod
     def serialize(value):
         return json.dumps(value, cls=DateTimeEncoder).encode("utf-8")

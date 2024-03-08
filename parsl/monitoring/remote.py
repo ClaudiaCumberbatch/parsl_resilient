@@ -101,5 +101,7 @@ def send_first_last_message(try_id: int,
             }
     )
     radio.send(msg)
+    if isinstance(radio, radios.DiasporaRadio):
+        radio.flush()
     return
 

@@ -56,7 +56,8 @@ def fresh_config():
                     launcher=SingleNodeLauncher(),
                 ),
                 block_error_handler=False,
-                energy_monitor="FakeNodeEnergyMonitor"
+                energy_monitor="FakeNodeEnergyMonitor",
+                radio_mode="diaspora"
             )
         ],
         strategy='simple',

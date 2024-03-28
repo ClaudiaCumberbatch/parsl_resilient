@@ -540,7 +540,7 @@ class DatabaseManager:
 
                 """
                 resource_messages = self._get_messages_in_batch(self.pending_resource_queue)
-                logger.error(f'Resource messages: {resource_messages}')
+                # logger.error(f'Resource messages: {resource_messages}')
                 if resource_messages:
                     logger.debug(
                         "Got {} messages from resource queue, "

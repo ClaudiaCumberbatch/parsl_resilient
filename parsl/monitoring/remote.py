@@ -82,6 +82,7 @@ def send_first_last_message(try_id: int,
                             monitoring_hub_url: str,
                             run_id: str, radio_mode: str, run_dir: str,
                             is_last: bool) -> None:
+    return
     import platform
     import os
 

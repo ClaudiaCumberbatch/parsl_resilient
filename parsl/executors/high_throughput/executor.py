@@ -235,7 +235,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                  block_error_handler: Union[bool, Callable[[BlockProviderExecutor, Dict[str, JobStatus]], None]] = True,
                  encrypted: bool = False,
                  energy_monitor: Optional[str] = None,
-                 radio_mode: str = "diaspora",):
+                #  radio_mode: str = "diaspora",):
+                 radio_mode: str = "htex",):
 
         logger.debug("Initializing HighThroughputExecutor")
 
@@ -303,6 +304,7 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         self.resource_monitoring_enabled = False
         self.energy_monitor = energy_monitor
         self.monitor_energy = (energy_monitor is not None)
+        self.radio_mode = radio_mode
 
     # radio_mode = "diaspora"
 
@@ -349,8 +351,9 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
                                        monitor_resources=monitor_resources,
                                        url="fake" if not monitor_resources else self.monitoring_hub_url,
                                        run_id="0" if not self.run_id else self.run_id,
-                                    #    radio_mode="fake" if not self.radio_mode else self.radio_mode,
-                                       radio_mode="diaspora",
+                                       radio_mode="fake" if not self.radio_mode else self.radio_mode,
+                                    #    radio_mode="diaspora",
+                                    #    radio_mode="htex",
                                        rundir=self.run_dir,
                                        sleep_dur= 0 if not monitor_resources else self.resource_monitoring_interval,
                                        energy_monitor=energy_monitor,)

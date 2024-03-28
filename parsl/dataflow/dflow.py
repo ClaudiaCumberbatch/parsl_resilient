@@ -219,7 +219,7 @@ class DataFlowKernel:
         radio = radios.get_monitoring_radio(self.monitoring.monitoring_hub_url, task_record['id'], executor.radio_mode, self.run_dir)
 
         msg = (MessageType.FAILURE_INFO, task_log_info)
-        radio.send(msg)
+        # radio.send(msg)
         if isinstance(radio, radios.DiasporaRadio):
             radio.flush()
 
@@ -592,7 +592,10 @@ class DataFlowKernel:
         """Remove task with task_id from the internal tasks table
         """
         if self.config.garbage_collect:
-            del self.tasks[task_id]
+            # logger.debug(f"self.tasks = {self.tasks}")
+            # logger.debug(f"task_id = {task_id}")
+            if task_id in self.tasks.keys():
+                del self.tasks[task_id]
 
     @staticmethod
     def check_staging_inhibited(kwargs: Dict[str, Any]) -> bool:

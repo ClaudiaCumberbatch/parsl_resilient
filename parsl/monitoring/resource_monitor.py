@@ -196,6 +196,9 @@ def resource_monitor_loop(monitoring_hub_url: str,
     next_send = time.time()
 
     def check_queue_contents(q, target):
+        '''
+        Check if the target is in the queue and return True if it is, False otherwise.
+        '''
         temp_list = []
         res = False
         while not q.empty():
@@ -209,8 +212,12 @@ def resource_monitor_loop(monitoring_hub_url: str,
             q.put(item)
         return res
 
+    c_time = time.time()
     while not terminate_event.is_set():
         logger.debug("start of monitoring loop")
+        logger.debug("time since last loop: {}".format(time.time() - c_time))
+        logger.debug(f"sleep_dur = {sleep_dur}")
+        c_time = time.time()
         for proc in psutil.process_iter(['pid', 'username', 'name', 'ppid']): # traverse
             if proc.info["username"] != user_name or proc.info["pid"] == os.getpid() or not check_queue_contents(procQueue, proc.info["pid"]):
             # if proc.info["username"] != user_name or proc.info["pid"] == os.getpid():
@@ -233,8 +240,11 @@ def resource_monitor_loop(monitoring_hub_url: str,
 
             try:
                 d = measure_resource_utilization(run_id, block_id, proc, profiler)
-                logger.debug("Sending intermediate resource message".format(d))
+                # logger.debug("Sending intermediate resource message {}".format(d))
+                start = time.time()
                 radio.send((MessageType.RESOURCE_INFO, d))
+                end = time.time()
+                logger.error(f"start = {start}, end = {end}, Sent message in {end-start} seconds")
             except Exception:
                 logger.exception("Exception getting the resource usage. Not sending usage to Hub", exc_info=True)
 
@@ -242,7 +252,7 @@ def resource_monitor_loop(monitoring_hub_url: str,
             try:
                 d = measure_energy_use(energy_monitor, run_id, block_id, sleep_dur)
                 logger.debug("Sending energy message")
-                radio.send((MessageType.ENERGY_INFO, d))
+                # radio.send((MessageType.ENERGY_INFO, d))
             except Exception:
                 logger.exception("Exception getting the resource usage. Not sending usage to Hub", exc_info=True)
         

@@ -59,7 +59,6 @@ class DiasporaRadio(MonitoringRadio):
         return
     
     def flush(self):
-        # pass
         self.producer.flush()
         return
     

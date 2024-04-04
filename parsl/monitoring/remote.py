@@ -82,7 +82,10 @@ def send_first_last_message(try_id: int,
                             monitoring_hub_url: str,
                             run_id: str, radio_mode: str, run_dir: str,
                             is_last: bool) -> None:
+    # in performance evaluation, this part is super super slow (which is really weird), 
+    # so simply do nothing and return
     return
+    '''
     import platform
     import os
 
@@ -105,4 +108,4 @@ def send_first_last_message(try_id: int,
     if isinstance(radio, radios.DiasporaRadio):
         radio.flush()
     return
-
+    '''

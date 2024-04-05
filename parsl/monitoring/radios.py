@@ -34,10 +34,7 @@ class DiasporaRadio(MonitoringRadio):
     def __init__(self, monitoring_url: str, source_id: int, timeout: int = 10):
         from diaspora_event_sdk import KafkaProducer
         self.source_id = source_id
-        self.producer = KafkaProducer(
-            value_serializer=DiasporaRadio.serialize,
-            batch_size=2097152,
-            acks=0)
+        self.producer = KafkaProducer(value_serializer=DiasporaRadio.serialize)
         logger.info("Diaspora-based monitoring channel initializing")
 
     def send(self, message: object) -> None:
@@ -53,12 +50,14 @@ class DiasporaRadio(MonitoringRadio):
         else:
             logger.info("set key as init")
             key = b"init"
-        # logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
+        logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
         self.producer.send(topic=topic, key=key, value=message[1])
-        # logger.info(f"Sent message")
+        self.producer.flush()
+        logger.info(f"Sent message")
         return
     
     def flush(self):
+        logger.info(f"diaspora producer flushing")
         self.producer.flush()
         return
     

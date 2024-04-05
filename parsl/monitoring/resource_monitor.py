@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import datetime
-import logging
 import platform
 import psutil
 import getpass

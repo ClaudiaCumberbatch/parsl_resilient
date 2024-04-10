@@ -868,18 +868,18 @@ if __name__ == "__main__":
                                             daemon=True)
             monitor_process.start()
 
-            from parsl.monitoring.diaspora_consumer import diaspora_consumer_loop
-            diaspora_consumer_process = mpForkProcess(target=diaspora_consumer_loop,
-                                                      args=(args.uid,
-                                                            args.run_id,
-                                                            logging.DEBUG if args.debug is True else logging.INFO,
-                                                            args.logdir,
-                                                            args.block_id,
-                                                            "radio-test",
-                                                            terminate_event,
-                                                            start_time),
-                                                      daemon=True)
-            diaspora_consumer_process.start()
+            # from parsl.monitoring.diaspora_consumer import diaspora_consumer_loop
+            # diaspora_consumer_process = mpForkProcess(target=diaspora_consumer_loop,
+            #                                           args=(args.uid,
+            #                                                 args.run_id,
+            #                                                 logging.DEBUG if args.debug is True else logging.INFO,
+            #                                                 args.logdir,
+            #                                                 args.block_id,
+            #                                                 "radio-test",
+            #                                                 terminate_event,
+            #                                                 start_time),
+            #                                           daemon=True)
+            # diaspora_consumer_process.start()
 
             manager.start(procQueue)
             

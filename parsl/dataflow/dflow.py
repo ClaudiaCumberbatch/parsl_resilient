@@ -11,6 +11,8 @@ import inspect
 import threading
 import sys
 import datetime
+import multiprocessing
+from multiprocessing import Process, Queue
 import parsl.monitoring.radios as radios
 from getpass import getuser
 from typeguard import typechecked
@@ -46,6 +48,7 @@ from parsl.providers.base import ExecutionProvider
 from parsl.utils import get_version, get_std_fname_mode, get_all_checkpoints, Timer
 
 from parsl.monitoring.message_type import MessageType
+from parsl.multiprocessing import ForkProcess as mpForkProcess
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +107,22 @@ class DataFlowKernel:
         # Monitoring
         self.run_id = str(uuid4())
 
+        start_time = time.time()
         self.monitoring: Optional[MonitoringHub]
         self.monitoring = config.monitoring
+
+        from parsl.dataflow.diaspora_c import diaspora_consumer_loop
+        terminate_event = multiprocessing.Event()
+        self.instruction_queue = Queue()
+        diaspora_consumer_process = mpForkProcess(target=diaspora_consumer_loop,
+                                                    args=(logging.DEBUG,
+                                                        self.run_dir,
+                                                        "radio-test",
+                                                        terminate_event,
+                                                        start_time,
+                                                        self.instruction_queue),
+                                                    daemon=True)
+        diaspora_consumer_process.start()
 
         # hub address and port for interchange to connect
         self.hub_address = None  # type: Optional[str]
@@ -204,7 +221,7 @@ class DataFlowKernel:
         self.tasks: Dict[int, TaskRecord] = {}
         self.submitter_lock = threading.Lock()
 
-        atexit.register(self.atexit_cleanup)
+        atexit.register(self.atexit_cleanup, terminate_event)
 
     def _send_task_log_info(self, task_record: TaskRecord) -> None:
         if self.monitoring:
@@ -714,7 +731,16 @@ class DataFlowKernel:
             return memo_fu
 
         task_record['from_memo'] = False
-        executor_label = task_record["executor"]
+        executor_label = task_record["executor"] # here can specify the executor
+        # TODO: retry on another executor if the specified one is not available
+        if not self.instruction_queue.empty():
+            logger.debug("queue not empty, set to another executor")
+            executor_labels = [l for l in self.executors.keys() if l != executor_label]
+            choice = random.choice(executor_labels)
+            executor_label = choice
+        else:
+            logger.debug("queue empty, set to specified executor")
+
         try:
             executor = self.executors[executor_label]
         except Exception:
@@ -1166,10 +1192,10 @@ class DataFlowKernel:
         block_executors = [e for e in executors if isinstance(e, BlockProviderExecutor)]
         self.job_status_poller.add_executors(block_executors)
 
-    def atexit_cleanup(self) -> None:
+    def atexit_cleanup(self, diaspora_terminate_event) -> None:
         if not self.cleanup_called:
             logger.info("DFK cleanup because python process is exiting")
-            self.cleanup()
+            self.cleanup(diaspora_terminate_event)
         else:
             logger.info("python process is exiting, but DFK has already been cleaned up")
 
@@ -1198,7 +1224,7 @@ class DataFlowKernel:
         logger.info("All remaining tasks completed")
 
     @wrap_with_logs
-    def cleanup(self) -> None:
+    def cleanup(self, diaspora_terminate_event) -> None:
         """DataFlowKernel cleanup.
 
         This involves releasing all resources explicitly.
@@ -1206,6 +1232,7 @@ class DataFlowKernel:
         We call scale_in on each of the executors and call executor.shutdown.
         """
         logger.info("DFK cleanup initiated")
+        diaspora_terminate_event.set()
 
         # this check won't detect two DFK cleanups happening from
         # different threads extremely close in time because of

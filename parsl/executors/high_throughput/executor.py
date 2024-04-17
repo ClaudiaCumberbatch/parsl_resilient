@@ -40,6 +40,7 @@ DEFAULT_LAUNCH_CMD = ("PARSL_MONITORING_HUB_URL={url} "
                       "PARSL_RUN_ID={run_id} "
                       "PARSL_RUN_DIR={rundir} "
                       "process_worker_pool.py {debug} {max_workers} "
+                      "--label {label} "
                       "-a {addresses} "
                       "-p {prefetch_capacity} "
                       "-c {cores_per_worker} "
@@ -331,7 +332,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         if self.address_probe_timeout:
             address_probe_timeout_string = "--address_probe_timeout={}".format(self.address_probe_timeout)
 
-        l_cmd = self.launch_cmd.format(debug=debug_opts,
+        l_cmd = self.launch_cmd.format(label=self.label,
+                                       debug=debug_opts,
                                        prefetch_capacity=self.prefetch_capacity,
                                        address_probe_timeout_string=address_probe_timeout_string,
                                        addresses=self.all_addresses,

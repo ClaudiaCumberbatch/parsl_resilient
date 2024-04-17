@@ -223,7 +223,7 @@ class DataFlowKernel:
         radio = radios.get_monitoring_radio(self.monitoring.monitoring_hub_url, task_record['id'], executor.radio_mode, self.run_dir)
 
         msg = (MessageType.FAILURE_INFO, task_log_info)
-        # radio.send(msg)
+        radio.send(msg)
         if isinstance(radio, radios.DiasporaRadio):
             radio.flush()
 
@@ -726,8 +726,8 @@ class DataFlowKernel:
                                         self.config.resilience_strategy, # strategy
                                         logging.DEBUG,
                                         self.run_dir,
-                                        "failure-info",
                                         self.start_time)
+        task_record["executor"] = executor_label
 
         try:
             executor = self.executors[executor_label]

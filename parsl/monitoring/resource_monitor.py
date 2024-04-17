@@ -162,7 +162,8 @@ def start_file_logger(filename, rank, name=__name__, level=logging.DEBUG, format
     
     return logger
 
-def resource_monitor_loop(monitoring_hub_url: str,
+def resource_monitor_loop(executor_label: str,
+            monitoring_hub_url: str,
             manager_id: str,
             run_id: str,
             radio_mode: str,
@@ -235,6 +236,7 @@ def resource_monitor_loop(monitoring_hub_url: str,
 
             try:
                 d = measure_resource_utilization(run_id, block_id, proc, profiler)
+                d["executor_label"] = executor_label
                 # logger.debug("Sending intermediate resource message {}".format(d))
                 # for performance evaluation
                 # start = time.time()

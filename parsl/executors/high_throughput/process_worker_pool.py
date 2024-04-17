@@ -734,6 +734,7 @@ def start_file_logger(filename, rank, name='parsl', level=logging.DEBUG, format_
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--label", help="Label of executor")
     parser.add_argument("-d", "--debug", action='store_true',
                         help="Enable logging at DEBUG level")
     parser.add_argument("-a", "--addresses", default='',
@@ -854,7 +855,8 @@ if __name__ == "__main__":
             procQueue = multiprocessing.Queue()
             start_time = time.time()
             monitor_process = mpForkProcess(target=resource_monitor_loop,
-                                            args=(args.monitoring_url,
+                                            args=(args.label,
+                                                    args.monitoring_url,
                                                     args.uid,
                                                     args.run_id,
                                                     args.radio_mode,
@@ -867,19 +869,6 @@ if __name__ == "__main__":
                                                     procQueue),
                                             daemon=True)
             monitor_process.start()
-
-            # from parsl.monitoring.diaspora_consumer import diaspora_consumer_loop
-            # diaspora_consumer_process = mpForkProcess(target=diaspora_consumer_loop,
-            #                                           args=(args.uid,
-            #                                                 args.run_id,
-            #                                                 logging.DEBUG if args.debug is True else logging.INFO,
-            #                                                 args.logdir,
-            #                                                 args.block_id,
-            #                                                 "radio-test",
-            #                                                 terminate_event,
-            #                                                 start_time),
-            #                                           daemon=True)
-            # diaspora_consumer_process.start()
 
             manager.start(procQueue)
             

@@ -91,7 +91,8 @@ class Config(RepresentationMixin):
                  max_idletime: float = 120.0,
                  monitoring: Optional[MonitoringHub] = None,
                  usage_tracking: bool = False,
-                 initialize_logging: bool = True) -> None:
+                 initialize_logging: bool = True,
+                 resilience_strategy: Optional[str] = None) -> None: # Optional[Callable] = None?
 
         executors = tuple(executors or [])
         if not executors:
@@ -125,6 +126,7 @@ class Config(RepresentationMixin):
         self.usage_tracking = usage_tracking
         self.initialize_logging = initialize_logging
         self.monitoring = monitoring
+        self.resilience_strategy = resilience_strategy
 
     @property
     def executors(self) -> Sequence[ParslExecutor]:

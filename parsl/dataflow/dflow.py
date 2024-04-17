@@ -107,22 +107,9 @@ class DataFlowKernel:
         # Monitoring
         self.run_id = str(uuid4())
 
-        start_time = time.time()
+        self.start_time = time.time()
         self.monitoring: Optional[MonitoringHub]
         self.monitoring = config.monitoring
-
-        from parsl.dataflow.diaspora_c import diaspora_consumer_loop
-        terminate_event = multiprocessing.Event()
-        self.instruction_queue = Queue()
-        diaspora_consumer_process = mpForkProcess(target=diaspora_consumer_loop,
-                                                    args=(logging.DEBUG,
-                                                        self.run_dir,
-                                                        "radio-test",
-                                                        terminate_event,
-                                                        start_time,
-                                                        self.instruction_queue),
-                                                    daemon=True)
-        diaspora_consumer_process.start()
 
         # hub address and port for interchange to connect
         self.hub_address = None  # type: Optional[str]
@@ -221,7 +208,7 @@ class DataFlowKernel:
         self.tasks: Dict[int, TaskRecord] = {}
         self.submitter_lock = threading.Lock()
 
-        atexit.register(self.atexit_cleanup, terminate_event)
+        atexit.register(self.atexit_cleanup)
 
     def _send_task_log_info(self, task_record: TaskRecord) -> None:
         if self.monitoring:
@@ -731,15 +718,16 @@ class DataFlowKernel:
             return memo_fu
 
         task_record['from_memo'] = False
-        executor_label = task_record["executor"] # here can specify the executor
-        # TODO: retry on another executor if the specified one is not available
-        if not self.instruction_queue.empty():
-            logger.debug("queue not empty, set to another executor")
-            executor_labels = [l for l in self.executors.keys() if l != executor_label]
-            choice = random.choice(executor_labels)
-            executor_label = choice
-        else:
-            logger.debug("queue empty, set to specified executor")
+        executor_label = task_record["executor"]
+        # add resilience module here
+        # TODO: different strategy?
+        from parsl.dataflow.diaspora_c import choose_executor
+        executor_label = choose_executor(self.executors,
+                                        self.config.resilience_strategy, # strategy
+                                        logging.DEBUG,
+                                        self.run_dir,
+                                        "failure-info",
+                                        self.start_time)
 
         try:
             executor = self.executors[executor_label]
@@ -1192,10 +1180,10 @@ class DataFlowKernel:
         block_executors = [e for e in executors if isinstance(e, BlockProviderExecutor)]
         self.job_status_poller.add_executors(block_executors)
 
-    def atexit_cleanup(self, diaspora_terminate_event) -> None:
+    def atexit_cleanup(self) -> None:
         if not self.cleanup_called:
             logger.info("DFK cleanup because python process is exiting")
-            self.cleanup(diaspora_terminate_event)
+            self.cleanup()
         else:
             logger.info("python process is exiting, but DFK has already been cleaned up")
 
@@ -1224,7 +1212,7 @@ class DataFlowKernel:
         logger.info("All remaining tasks completed")
 
     @wrap_with_logs
-    def cleanup(self, diaspora_terminate_event) -> None:
+    def cleanup(self) -> None:
         """DataFlowKernel cleanup.
 
         This involves releasing all resources explicitly.
@@ -1232,7 +1220,6 @@ class DataFlowKernel:
         We call scale_in on each of the executors and call executor.shutdown.
         """
         logger.info("DFK cleanup initiated")
-        diaspora_terminate_event.set()
 
         # this check won't detect two DFK cleanups happening from
         # different threads extremely close in time because of

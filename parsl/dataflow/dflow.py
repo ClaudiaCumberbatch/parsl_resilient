@@ -726,7 +726,8 @@ class DataFlowKernel:
                                         self.config.resilience_strategy, # strategy
                                         logging.DEBUG,
                                         self.run_dir,
-                                        self.start_time)
+                                        self.start_time,
+                                        task_record)
         task_record["executor"] = executor_label
 
         try:

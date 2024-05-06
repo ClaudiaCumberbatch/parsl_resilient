@@ -211,9 +211,28 @@ def resource_monitor_loop(executor_label: str,
         for item in temp_list:
             q.put(item)
         return res
+    
+    def aggregate_resources(data):
+        totals = {
+            'psutil_process_memory_percent': 0,
+            'psutil_process_memory_virtual': 0,
+            'psutil_process_memory_resident': 0,
+            'psutil_cpu_count': 0,
+            'psutil_process_time_user': 0,
+            'psutil_process_time_system': 0,
+            'psutil_process_disk_write': 0,
+            'psutil_process_disk_read': 0,
+        }
+
+        for pid, info in data.items():
+            for key in totals.keys():
+                totals[key] += info[key]
+
+        return totals
 
     while not terminate_event.is_set():
         logger.debug("start of monitoring loop")
+        process_info_dic = {}
         for proc in psutil.process_iter(['pid', 'username', 'name', 'ppid']): # traverse
             if proc.info["username"] != user_name or proc.info["pid"] == os.getpid() or not check_queue_contents(procQueue, proc.info["pid"]):
             # if proc.info["username"] != user_name or proc.info["pid"] == os.getpid():
@@ -237,6 +256,7 @@ def resource_monitor_loop(executor_label: str,
             try:
                 d = measure_resource_utilization(run_id, block_id, proc, profiler)
                 d["executor_label"] = executor_label
+                process_info_dic[proc.info["pid"]] = d
                 # logger.debug("Sending intermediate resource message {}".format(d))
                 # for performance evaluation
                 # start = time.time()
@@ -254,6 +274,11 @@ def resource_monitor_loop(executor_label: str,
             except Exception:
                 logger.exception("Exception getting the resource usage. Not sending usage to Hub", exc_info=True)
         
+        logger.debug(f"process_info_dic is {process_info_dic}")
+        aggregated_dic = aggregate_resources(process_info_dic)
+        aggregated_dic["executor_label"] = executor_label
+        logger.debug(f"aggregated_dic = {aggregated_dic}")
+        radio.send((MessageType.EXECUTOR_INFO, aggregated_dic))
         logger.debug("sleeping")
         terminate_event.wait(max(0, next_send - time.time()))
         next_send += sleep_dur

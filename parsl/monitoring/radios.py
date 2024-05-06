@@ -45,11 +45,13 @@ class DiasporaRadio(MonitoringRadio):
             topic = "failure-info"
         else:
             topic = "radio-test"
-        if 'run_id' in message[1]:
-            key = message[1]['run_id'].encode("utf-8")
+        if 'pid' in message[1]:
+            key = str(message[1]['pid']).encode("utf-8")
+        elif 'executor_label' in message[1]:
+            key = message[1]['executor_label'].encode("utf-8")
         else:
-            logger.info("set key as init")
-            key = b"init"
+            logger.info("set key as default")
+            key = b"default"
         logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
         self.producer.send(topic=topic, key=key, value=message[1])
         self.producer.flush()

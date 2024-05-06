@@ -23,3 +23,6 @@ class MessageType(Enum):
 
     # Reports of failure information
     FAILURE_INFO = 6
+
+    # Reports of Executor
+    EXECUTOR_INFO = 7

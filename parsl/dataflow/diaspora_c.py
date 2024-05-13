@@ -82,21 +82,24 @@ def choose_by_fail_num(logger, start_time) -> str:
     min_fail_executor = [k for k, v in fail_executor.items() if v == min_fail]
     return min_fail_executor
 
-def choose_by_fail_type(logger, start_time, executors, parsl_log_path, task_record) -> str:
-    # loop over the log file
-    is_resource_err = False
+def is_resource_error(parsl_log_path):
     with open(parsl_log_path, 'r') as file:
         for line in file:
             if "Lost" in line:
-                is_resource_err = True
-                break
+                return True
+    return False
+
+def choose_by_fail_type(logger, start_time, executors, run_dir, task_record) -> str:
+    # loop over the log file
+    is_resource_err = False
+    parsl_log_path = '{}/parsl.log'.format(run_dir)
+    # if there's a ManagerLost or a WorkerLost in parsl.log, it's likely to be a resource error
+    is_resource_err = is_resource_error(parsl_log_path)
     
     if not is_resource_err:
         return random.choice(list(executors.keys()))
-    else: # if want to use the info in radio-test, how to decide whether it's a mem error?
-        logger.warning(f"task record is {task_record}") 
-        logger.warning(f"time invoked is {task_record['time_invoked']}")
-
+    else:
+        # TODO: switch case?
         # read resource info from diaspora
         topic = "radio-test"
         logger.warning("Creating Kafka consumer for topic: {}".format(topic))
@@ -116,7 +119,8 @@ def choose_by_fail_type(logger, start_time, executors, parsl_log_path, task_reco
         last_offset = end_offsets[topic_partition] - 1
         logger.warning(f"last offset = {last_offset}")
 
-        # get corresponding executor resource info
+        # get executor resource info
+        # TODO: here the traversal is slow, should find better method
         last_executor_info = {}
         for message in consumer:
             logger.warning("Received message: {}".format(message))
@@ -133,6 +137,12 @@ def choose_by_fail_type(logger, start_time, executors, parsl_log_path, task_reco
             if message.offset >= last_offset:
                 break
 
+        # TODO: define error classes and handlers
+
+        # figure out how long has the executor been run, compare with the walltime limit
+        run_time = time.time() - last_executor_info[task_record['executor']]['start_time']
+        logger.warning(f"{task_record['executor']} has run for {run_time}")
+
         # switch to the executor with the least memory usage
         import sys
         min_mem = sys.maxsize
@@ -142,6 +152,7 @@ def choose_by_fail_type(logger, start_time, executors, parsl_log_path, task_reco
             if resource_info['psutil_process_memory_resident'] < min_mem:
                 min_mem = resource_info['psutil_process_memory_resident']
                 res = executor
+
         return res
 
 
@@ -160,14 +171,14 @@ def choose_executor(executors: Dict[str, ParslExecutor],
     logger = start_file_logger('{}/resilience_module.log'.format(run_dir),
                             0,
                             level=logging_level)
-    parsl_log_path = '{}/parsl.log'.format(run_dir)
+    
     
     if task_record["fail_count"] == 0: # only apply strategy after failure occurs
         label = random.choice(list(executors.keys()))
     elif strategy == "fail_num":
         label = choose_by_fail_num(logger, start_time, executors)[0]
     elif strategy == "fail_type":
-        label = choose_by_fail_type(logger, start_time, executors, parsl_log_path, task_record)
+        label = choose_by_fail_type(logger, start_time, executors, run_dir, task_record)
     else: # random
        label = random.choice(list(executors.keys()))
 

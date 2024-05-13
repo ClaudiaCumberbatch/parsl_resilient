@@ -182,6 +182,8 @@ def resource_monitor_loop(executor_label: str,
                                    0,
                                    level=logging.DEBUG)
     logger.warning("Starting resource monitor!")
+    import time
+    loop_start_time = time.time()
 
     radio: radios.MonitoringRadio
     radio = radios.get_monitoring_radio(monitoring_hub_url, manager_id, radio_mode, run_dir)
@@ -218,8 +220,6 @@ def resource_monitor_loop(executor_label: str,
             'psutil_process_memory_virtual': 0,
             'psutil_process_memory_resident': 0,
             'psutil_cpu_count': 0,
-            'psutil_process_time_user': 0,
-            'psutil_process_time_system': 0,
             'psutil_process_disk_write': 0,
             'psutil_process_disk_read': 0,
         }
@@ -277,6 +277,7 @@ def resource_monitor_loop(executor_label: str,
         logger.debug(f"process_info_dic is {process_info_dic}")
         aggregated_dic = aggregate_resources(process_info_dic)
         aggregated_dic["executor_label"] = executor_label
+        aggregated_dic["start_time"] = loop_start_time
         logger.debug(f"aggregated_dic = {aggregated_dic}")
         radio.send((MessageType.EXECUTOR_INFO, aggregated_dic))
         logger.debug("sleeping")

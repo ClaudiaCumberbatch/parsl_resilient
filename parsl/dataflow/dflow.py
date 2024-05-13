@@ -722,7 +722,7 @@ class DataFlowKernel:
         # add resilience module here
         # TODO: different strategy?
         from parsl.dataflow.diaspora_c import choose_executor
-        executor_label = choose_executor(self.executors,
+        executor_label = choose_executor({k: v for k, v in self.executors.items() if k != '_parsl_internal'},
                                         self.config.resilience_strategy, # strategy
                                         logging.DEBUG,
                                         self.run_dir,

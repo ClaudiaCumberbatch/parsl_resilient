@@ -227,7 +227,12 @@ def resource_monitor_loop(executor_label: str,
         for pid, info in data.items():
             for key in totals.keys():
                 totals[key] += info[key]
-
+        
+        for pid, info in data.items():
+            if info['hostname']:
+                totals['hostname'] = info['hostname']
+                break
+        
         return totals
 
     while not terminate_event.is_set():

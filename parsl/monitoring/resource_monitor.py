@@ -214,7 +214,10 @@ def resource_monitor_loop(executor_label: str,
             q.put(item)
         return res
     
-    def aggregate_resources(data):
+    def aggregate_resources(data: dict):
+        """
+        Aggregate process info into node info (by hostname) and executor info (by executor_label).
+        """
         totals = {
             'psutil_process_memory_percent': 0,
             'psutil_process_memory_virtual': 0,
@@ -265,7 +268,7 @@ def resource_monitor_loop(executor_label: str,
                 # logger.debug("Sending intermediate resource message {}".format(d))
                 # for performance evaluation
                 # start = time.time()
-                radio.send((MessageType.RESOURCE_INFO, d))
+                radio.send((MessageType.RESOURCE_INFO, d)) # worker
                 # end = time.time()
                 # logger.error(f"start = {start}, end = {end}, Sent message in {end-start} seconds")
             except Exception:
@@ -279,13 +282,14 @@ def resource_monitor_loop(executor_label: str,
             except Exception:
                 logger.exception("Exception getting the resource usage. Not sending usage to Hub", exc_info=True)
         
-        logger.debug(f"process_info_dic is {process_info_dic}")
+        # logger.debug(f"process_info_dic is {process_info_dic}")
         aggregated_dic = aggregate_resources(process_info_dic)
         aggregated_dic["executor_label"] = executor_label
         aggregated_dic["start_time"] = loop_start_time
-        logger.debug(f"aggregated_dic = {aggregated_dic}")
+        # logger.debug(f"aggregated_dic = {aggregated_dic}")
         radio.send((MessageType.EXECUTOR_INFO, aggregated_dic))
-        logger.debug("sleeping")
+        radio.send((MessageType.NODE_INFO, aggregated_dic))
+        # logger.debug("sleeping")
         terminate_event.wait(max(0, next_send - time.time()))
         next_send += sleep_dur
 

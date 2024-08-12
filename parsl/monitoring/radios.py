@@ -39,19 +39,23 @@ class DiasporaRadio(MonitoringRadio):
 
     def send(self, message: object) -> None:
         msg_type = message[0]
-        # TODO: make configurable
+        # TODO: make topic name configurable
         if msg_type == MessageType.FAILURE_INFO:
-            logger.info("got a fail type")
             topic = "failure-info"
-        else:
-            topic = "radio-test"
-        if 'pid' in message[1]:
+            key = b"default"
+        elif msg_type == MessageType.RESOURCE_INFO:
+            topic = "resilience-worker"
             key = str(message[1]['pid']).encode("utf-8")
-        elif 'executor_label' in message[1]:
+        elif msg_type == MessageType.NODE_INFO:
+            topic = "resilience-manager"
+            key = message[1]['hostname'].encode("utf-8")
+        elif msg_type == MessageType.EXECUTOR_INFO:
+            topic = "resilience-executor"
             key = message[1]['executor_label'].encode("utf-8")
         else:
-            logger.info("set key as default")
+            topic = "radio-test"
             key = b"default"
+
         logger.info(f"Sending message of type {key}:{msg_type} to topic {topic}, content {message[1]}")
         self.producer.send(topic=topic, key=key, value=message[1])
         self.producer.flush()

@@ -685,6 +685,7 @@ def worker(
             serialized_result = serialize(result, buffer_threshold=1000000)
         except Exception as e:
             logger.info('Caught an exception: {}'.format(e))
+            # TODO: add platform.node()?
             result_package = {'type': 'result', 'task_id': tid, 'exception': serialize(RemoteExceptionWrapper(*sys.exc_info()))}
         else:
             result_package = {'type': 'result', 'task_id': tid, 'result': serialized_result}

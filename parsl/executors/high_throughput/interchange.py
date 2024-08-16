@@ -468,12 +468,17 @@ class Interchange:
             interesting=len(interesting_managers)))
 
         if interesting_managers and not self.pending_task_queue.empty():
+            # Sicheng changed logic here. Possibly be slower, but allows manager specification.
+            task_msg = self.get_tasks(1)
+            
+
+
             shuffled_managers = list(interesting_managers)
             random.shuffle(shuffled_managers)
 
             while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
                 manager_id = shuffled_managers.pop()
-                m = self._ready_managers[manager_id]
+                m = self._ready_managers[manager_id] # TODO: target node!!
                 tasks_inflight = len(m['tasks'])
                 real_capacity = m['max_capacity'] - tasks_inflight
 

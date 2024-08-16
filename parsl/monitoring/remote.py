@@ -84,15 +84,14 @@ def send_first_last_message(try_id: int,
                             is_last: bool) -> None:
     # in performance evaluation, this part is super super slow (which is really weird), 
     # so simply do nothing and return
-    return
-    '''
+    
     import platform
     import os
 
     radio: radios.MonitoringRadio
     radio = radios.get_monitoring_radio(monitoring_hub_url, task_id, radio_mode, run_dir)
 
-    msg = (MessageType.RESOURCE_INFO,
+    msg = (MessageType.ENERGY_INFO, # send task-try-hostname info to radio-test topic
            {'run_id': run_id,
             'try_id': try_id,
             'task_id': task_id,
@@ -108,4 +107,4 @@ def send_first_last_message(try_id: int,
     if isinstance(radio, radios.DiasporaRadio):
         radio.flush()
     return
-    '''
+

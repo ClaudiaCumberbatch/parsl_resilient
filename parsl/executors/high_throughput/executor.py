@@ -619,10 +619,10 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         Returns:
               Future
         """
-        if resource_specification:
-            logger.error("Ignoring the call specification. "
-                         "Parsl call specification is not supported in HighThroughput Executor.")
-            raise UnsupportedFeatureError('resource specification', 'HighThroughput Executor', None)
+        # if resource_specification:
+        #     logger.error("Ignoring the call specification. "
+        #                  "Parsl call specification is not supported in HighThroughput Executor.")
+        #     raise UnsupportedFeatureError('resource specification', 'HighThroughput Executor', None)
 
         if self.bad_state_is_set:
             raise self.executor_exception
@@ -645,7 +645,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         except TypeError:
             raise SerializationError(func.__name__)
 
-        msg = {"task_id": task_id, "buffer": fn_buf}
+        # here we use resource_specification as a recommended node (manager) list
+        msg = {"task_id": task_id, "resource_specification": resource_specification, "buffer": fn_buf} 
 
         # Post task to the outgoing queue
         self.outgoing_q.put(msg)

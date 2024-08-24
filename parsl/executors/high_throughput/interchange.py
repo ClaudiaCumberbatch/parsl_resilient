@@ -469,7 +469,7 @@ class Interchange:
 
         if interesting_managers and not self.pending_task_queue.empty():
             # Sicheng changed logic here. Possibly be slower, but allows manager specification.
-            task_msg = self.get_tasks(1)
+            # task_msg = self.get_tasks(1)
             
 
 

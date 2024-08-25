@@ -392,6 +392,9 @@ def filesystem_receiver(logdir: str, resource_queue: "queue.Queue[AddressedMonit
                     elif message[0][0] == MessageType.ENERGY_INFO:
                         logger.info(f"Putting result into energy_queue")
                         energy_queue.put(cast(AddressedMonitoringMessage, message))
+                    else:
+                        # leave MessageType.EXECUTOR_INFO and MessageType.NODE_INFO in the files
+                        continue
                     os.remove(full_path_filename)
                 except Exception:
                     logger.exception(f"Exception processing {filename} - probably will be retried next iteration")

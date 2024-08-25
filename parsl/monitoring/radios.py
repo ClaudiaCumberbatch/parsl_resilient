@@ -102,6 +102,7 @@ class FilesystemRadio(MonitoringRadio):
 
     def send(self, message: object) -> None:
         logger.info("Sending a monitoring message via filesystem")
+        logger.info(message[0])
 
         unique_id = str(uuid.uuid4())
 

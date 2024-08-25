@@ -347,12 +347,23 @@ class MonitoringHub(RepresentationMixin):
 @wrap_with_logs
 # def filesystem_receiver(logdir: str, q: "queue.Queue[AddressedMonitoringMessage]", run_dir: str) -> None:
 def filesystem_receiver(logdir: str, resource_queue: "queue.Queue[AddressedMonitoringMessage]", energy_queue: "queue.Queue[AddressedMonitoringMessage]", run_dir: str) -> None:
+    def find_monitor_fs_radio_dirs(root_dir: str) -> list:
+        found_dirs = []
+        for root, dirs, files in os.walk(root_dir):
+            for dir_name in dirs:
+                if dir_name == "monitor-fs-radio":
+                    dir_path = os.path.join(root, dir_name)
+                    found_dirs.append(os.path.abspath(dir_path))
+        
+        return found_dirs
+    
     logger = start_file_logger("{}/monitoring_filesystem_radio.log".format(logdir),
                                name="monitoring_filesystem_radio",
                                level=logging.INFO)
 
     logger.info("Starting filesystem radio receiver")
     setproctitle("parsl: monitoring filesystem receiver")
+
     base_path = f"{run_dir}/monitor-fs-radio/"
     tmp_dir = f"{base_path}/tmp/"
     new_dir = f"{base_path}/new/"
@@ -363,25 +374,27 @@ def filesystem_receiver(logdir: str, resource_queue: "queue.Queue[AddressedMonit
 
     while True:  # this loop will end on process termination
         logger.debug("Start filesystem radio receiver loop")
+        bases = find_monitor_fs_radio_dirs(run_dir)
 
-        # iterate over files in new_dir
-        for filename in os.listdir(new_dir):
-            try:
-                logger.info(f"Processing filesystem radio file {filename}")
-                full_path_filename = f"{new_dir}/{filename}"
-                with open(full_path_filename, "rb") as f:
-                    message = deserialize(f.read())
-                logger.debug(f"Message received is: {message}")
-                assert isinstance(message, tuple)
-                # q.put(cast(AddressedMonitoringMessage, message))
-                if message[0][0] == MessageType.RESOURCE_INFO:
-                    resource_queue.put(cast(AddressedMonitoringMessage, message))
-                elif message[0][0] == MessageType.ENERGY_INFO:
-                    logger.info(f"Putting result into energy_queue")
-                    energy_queue.put(cast(AddressedMonitoringMessage, message))
-                os.remove(full_path_filename)
-            except Exception:
-                logger.exception(f"Exception processing {filename} - probably will be retried next iteration")
+        for base_dir in bases:
+            new_dir = f"{base_dir}/new/"
+            # iterate over files in new_dir
+            for filename in os.listdir(new_dir):
+                try:
+                    full_path_filename = f"{new_dir}/{filename}"
+                    with open(full_path_filename, "rb") as f:
+                        message = deserialize(f.read())
+                    logger.debug(f"Message received is: {message}")
+                    assert isinstance(message, tuple)
+                    # q.put(cast(AddressedMonitoringMessage, message))
+                    if message[0][0] == MessageType.RESOURCE_INFO:
+                        resource_queue.put(cast(AddressedMonitoringMessage, message))
+                    elif message[0][0] == MessageType.ENERGY_INFO:
+                        logger.info(f"Putting result into energy_queue")
+                        energy_queue.put(cast(AddressedMonitoringMessage, message))
+                    os.remove(full_path_filename)
+                except Exception:
+                    logger.exception(f"Exception processing {filename} - probably will be retried next iteration")
 
         time.sleep(1)  # whats a good time for this poll?
 

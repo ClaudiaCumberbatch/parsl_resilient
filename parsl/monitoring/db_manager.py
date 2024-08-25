@@ -590,7 +590,7 @@ class DatabaseManager:
                 """
                 Energy Info Messages
                 """
-                energy_info_messages = self._get_messages_in_batch(self.pending_energy_queue) # 这玩意是空的可能说明queue里面没有东西
+                energy_info_messages = self._get_messages_in_batch(self.pending_energy_queue) 
                 if energy_info_messages:
                     logger.debug(
                         "Got {} messages from energy queue".format(len(energy_info_messages)))

@@ -91,7 +91,7 @@ def send_first_last_message(try_id: int,
     radio: radios.MonitoringRadio
     radio = radios.get_monitoring_radio(monitoring_hub_url, task_id, radio_mode, run_dir)
 
-    msg = (MessageType.ENERGY_INFO, # send task-try-hostname info to radio-test topic
+    msg = (MessageType.RESOURCE_INFO, # send task-try-hostname info to radio-test topic
            {'run_id': run_id,
             'try_id': try_id,
             'task_id': task_id,

@@ -230,6 +230,8 @@ class Database:
         block_id = Column('block_id', Text, nullable=False)
         run_id = Column('run_id', Text, sa.ForeignKey(
             'workflow.run_id'), nullable=False)
+        hostname = Column('hostname', Text, nullable=False)
+        executor_label = Column('executor_label', Text, nullable=False)
         timestamp = Column('timestamp', DateTime, nullable=False)
         # resource_monitoring_interval = Column(
         #     'resource_monitoring_interval', Float, nullable=True)

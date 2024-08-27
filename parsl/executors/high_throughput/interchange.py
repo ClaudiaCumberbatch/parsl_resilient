@@ -469,21 +469,24 @@ class Interchange:
 
         if interesting_managers and not self.pending_task_queue.empty():
             # Sicheng changed logic here. Possibly be slower, but allows manager specification.
-            # task_msg = self.get_tasks(1)
-            
-
 
             shuffled_managers = list(interesting_managers)
             random.shuffle(shuffled_managers)
 
             while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
-                manager_id = shuffled_managers.pop()
+                tasks = self.get_tasks(1)
+                logger.info(f"resource_specification is {tasks[0]['resource_specification']}")
+                if tasks[0]['resource_specification']:
+                    manager_id = tasks[0]['resource_specification']['manager_id']
+                else:
+                    manager_id = shuffled_managers.pop()
+                    
                 m = self._ready_managers[manager_id] # TODO: target node!!
                 tasks_inflight = len(m['tasks'])
                 real_capacity = m['max_capacity'] - tasks_inflight
 
                 if (real_capacity and m['active']):
-                    tasks = self.get_tasks(real_capacity)
+                    # tasks = self.get_tasks(real_capacity)
                     if tasks:
                         self.task_outgoing.send_multipart([manager_id, b'', pickle.dumps(tasks)])
                         task_count = len(tasks)

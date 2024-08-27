@@ -646,8 +646,8 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
             raise SerializationError(func.__name__)
 
         # here we use resource_specification as a recommended node (manager) list
-        # msg = {"task_id": task_id, "resource_specification": resource_specification, "buffer": fn_buf} 
-        msg = {"task_id": task_id, "buffer": fn_buf} 
+        # msg = {"task_id": task_id, "buffer": fn_buf} 
+        msg = {"task_id": task_id, "resource_specification": resource_specification, "buffer": fn_buf} 
 
 
         # Post task to the outgoing queue

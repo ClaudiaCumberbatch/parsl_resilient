@@ -474,7 +474,7 @@ class Interchange:
             random.shuffle(shuffled_managers)
 
             while shuffled_managers and not self.pending_task_queue.empty():  # cf. the if statement above...
-                tasks = self.get_tasks(1)
+                tasks = self.get_tasks(1) # TODO: add batching
                 logger.info(f"resource_specification is {tasks[0]['resource_specification']}")
                 if tasks[0]['resource_specification']:
                     manager_id = tasks[0]['resource_specification']['manager_id']

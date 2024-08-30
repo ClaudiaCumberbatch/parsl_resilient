@@ -208,6 +208,10 @@ class DataFlowKernel:
         self.tasks: Dict[int, TaskRecord] = {}
         self.submitter_lock = threading.Lock()
 
+        # For resilience module. key is the name of executors, value is the corresponding success rate.
+        self.denylist: Dict[str, float] = {key: 1.0 for key in self.executors.keys() if key != '_parsl_internal'}
+        # TODO: add manager denylist
+
         atexit.register(self.atexit_cleanup)
 
     def _send_task_log_info(self, task_record: TaskRecord) -> None:

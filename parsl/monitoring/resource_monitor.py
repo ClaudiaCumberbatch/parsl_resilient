@@ -58,6 +58,7 @@ def measure_resource_utilization(run_id: str,
 
         d.update({"psutil_process_" + str(k): v for k, v in proc.as_dict().items() if k in simple})
         d["psutil_cpu_count"] = psutil.cpu_count()
+        d["psutil_process_cpu_percent"] = proc.cpu_percent(interval=1)
         d['psutil_process_memory_virtual'] = proc.memory_info().vms
         d['psutil_process_memory_resident'] = proc.memory_info().rss
         d['psutil_process_time_user'] = proc.cpu_times().user
@@ -130,7 +131,15 @@ def measure_energy_use(energy_monitor: NodeEnergyMonitor,
     d["timestamp"] = datetime.datetime.now()
     d["duration"] = report.end_time - report.start_time
     return d
-    
+
+def measure_node_use():
+    d = dict()
+    d["hostname"] = platform.node()
+    d["memory_percent"] = psutil.virtual_memory().percent
+    d["memory_used"] = psutil.virtual_memory().used
+    d["memory_free"] = psutil.virtual_memory().free
+    d["cpu_percent"] = psutil.cpu_percent(interval=1)
+    return d
 
 def start_file_logger(filename, rank, name=__name__, level=logging.DEBUG, format_string=None):
     """Add a stream log handler.
@@ -222,7 +231,7 @@ def resource_monitor_loop(executor_label: str,
             'psutil_process_memory_percent': 0,
             'psutil_process_memory_virtual': 0,
             'psutil_process_memory_resident': 0,
-            'psutil_cpu_count': 0,
+            'psutil_process_cpu_percent': 0,
             'psutil_process_disk_write': 0,
             'psutil_process_disk_read': 0,
         }
@@ -282,6 +291,7 @@ def resource_monitor_loop(executor_label: str,
             except Exception:
                 logger.exception("Exception getting the resource usage. Not sending usage to Hub", exc_info=True)
         
+        '''
         # logger.debug(f"process_info_dic is {process_info_dic}")
         aggregated_dic = aggregate_resources(process_info_dic)
         aggregated_dic["executor_label"] = executor_label
@@ -290,6 +300,13 @@ def resource_monitor_loop(executor_label: str,
         radio.send((MessageType.EXECUTOR_INFO, aggregated_dic))
         radio.send((MessageType.NODE_INFO, aggregated_dic))
         # logger.debug("sleeping")
+        '''
+
+        d = measure_node_use()
+        d["start_time"] = loop_start_time
+        logger.error(f"node msg is {d}")
+        radio.send((MessageType.NODE_INFO, d))
+
         terminate_event.wait(max(0, next_send - time.time()))
         next_send += sleep_dur
 

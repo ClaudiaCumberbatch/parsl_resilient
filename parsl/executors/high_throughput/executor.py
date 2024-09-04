@@ -307,6 +307,9 @@ class HighThroughputExecutor(BlockProviderExecutor, RepresentationMixin):
         self.monitor_energy = (energy_monitor is not None)
         self.radio_mode = radio_mode
 
+        # For resilience module. key is the name of manager, value is the corresponding success rate.
+        self.denylist: Dict[str, float] = {}
+
     # radio_mode = "diaspora"
 
     @property

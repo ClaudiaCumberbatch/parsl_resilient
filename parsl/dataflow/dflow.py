@@ -210,7 +210,6 @@ class DataFlowKernel:
 
         # For resilience module. key is the name of executors, value is the corresponding success rate.
         self.denylist: Dict[str, float] = {key: 1.0 for key in self.executors.keys() if key != '_parsl_internal'}
-        # TODO: add manager denylist
 
         atexit.register(self.atexit_cleanup)
 

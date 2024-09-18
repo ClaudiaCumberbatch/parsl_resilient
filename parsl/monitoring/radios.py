@@ -101,8 +101,8 @@ class FilesystemRadio(MonitoringRadio):
         os.makedirs(self.new_path, exist_ok=True)
 
     def send(self, message: object) -> None:
-        logger.info("Sending a monitoring message via filesystem")
-        logger.info(message[0])
+        logger.debug("Sending a monitoring message via filesystem")
+        logger.debug(message[0])
 
         unique_id = str(uuid.uuid4())
 

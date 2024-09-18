@@ -310,15 +310,15 @@ class MonitoringHub(RepresentationMixin):
                 self.filesystem_proc.terminate()
             self.logger.info("Waiting for router to terminate")
             self.router_proc.join()
-            self.logger.debug("Finished waiting for router termination")
+            self.logger.info("Finished waiting for router termination")
             if len(exception_msgs) == 0:
-                self.logger.debug("Sending STOP to DBM")
+                self.logger.info("Sending STOP to DBM")
                 self.priority_msgs.put(("STOP", 0))
             else:
-                self.logger.debug("Not sending STOP to DBM, because there were DBM exceptions")
-            self.logger.debug("Waiting for DB termination")
+                self.logger.info("Not sending STOP to DBM, because there were DBM exceptions")
+            self.logger.info("Waiting for DB termination")
             self.dbm_proc.join()
-            self.logger.debug("Finished waiting for DBM termination")
+            self.logger.info("Finished waiting for DBM termination")
 
             # should this be message based? it probably doesn't need to be if
             # we believe we've received all messages

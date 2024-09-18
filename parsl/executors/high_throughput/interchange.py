@@ -505,6 +505,8 @@ class Interchange:
                             interesting_managers.remove(manager_id)
                 else:
                     interesting_managers.remove(manager_id)
+                    # put the task back to pending_task_queue
+                    self.pending_task_queue.put(tasks[0])
                     # logger.debug("Nothing to send to manager {}".format(manager_id))
             logger.debug("leaving _ready_managers section, with {} managers still interesting".format(len(interesting_managers)))
         else:

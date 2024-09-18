@@ -304,7 +304,7 @@ def resource_monitor_loop(executor_label: str,
 
         d = measure_node_use()
         d["start_time"] = loop_start_time
-        logger.error(f"node msg is {d}")
+        logger.debug(f"node msg is {d}")
         radio.send((MessageType.NODE_INFO, d))
 
         terminate_event.wait(max(0, next_send - time.time()))
